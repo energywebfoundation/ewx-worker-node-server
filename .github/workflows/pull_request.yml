@@ -18,7 +18,7 @@ jobs:
           release_branches: master
           custom_release_rules: major:major:Major Changes,minor:minor:Minor Changes,chore:patch:Chores
           dry_run: true
-          
+
       - uses: actions/setup-node@v2-beta
         with:
           node-version: '18.19'

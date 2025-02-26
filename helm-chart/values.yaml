@@ -49,10 +49,6 @@ env:
   PALLET_RPC_URL: https://public-rpc.mainnet.energywebx.com
   VOTING_RPC_URL: https://wns-rpc.mainnet.energywebx.com
   VOTING_WORKER_SEED: <SEED>
-  IPFS_API_KEY: <infura_ipfs_APIKEY>
-  IPFS_SECRET_KEY: <infura_ipfs_APISECRET>
-  IPFS_URL: https://ipfs.infura.io:5001
-  IPFS_CONTEXT_PATH: /api/v0/cat?arg=
 
 service:
   portName: ''

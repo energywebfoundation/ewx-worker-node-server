@@ -63,10 +63,14 @@ export const ENV_SCHEMA = z.object({
     .describe('Should enable NodeRed UI.'),
   RED_DIRECTORY: z.string().default('./node-red-data').describe('Storage of NodeRed flows.'),
   SQLITE_BASE_PATH: z.string().default('./sqlite').describe('Base SQLite path.'),
-  IPFS_API_KEY: z.string().describe('IPFS API Key'),
-  IPFS_SECRET_KEY: z.string().describe('IPFS Secret Key'),
-  IPFS_URL: z.string().describe('IPFS Url'),
-  IPFS_CONTEXT_PATH: z.string().describe('IPFS Context Path'),
+  IPFS_API_KEY: z.string().nullable().default(null).describe('IPFS API Key'),
+  IPFS_SECRET_KEY: z.string().nullable().default(null).describe('IPFS Secret Key'),
+  IPFS_URL: z.string().default('https://ipfs.io').describe('IPFS Url'),
+  IPFS_CONTEXT_PATH: z.string().default('/ipfs/').describe('IPFS Context Path'),
+  IPFS_USER_AGENT_VALUE: z
+    .string()
+    .default('ewx-worker-node-server')
+    .describe('Default user agent that is going to be used for public IPFS queries.'),
   SOLUTION_QUEUE_PROCESS_DELAY: z.coerce
     .number()
     .default(20000)

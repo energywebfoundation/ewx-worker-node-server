@@ -25,12 +25,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.release.tag_name }}
 
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Extract branch name
+        id: extract_branch
+        shell: bash
+        run: |
+          # Extract branch name from GITHUB_REF
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            # For tags
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          elif [[ $GITHUB_REF == refs/heads/* ]]; then
+            # For branches
+            echo "VERSION=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          else
+            # For pull requests and others
+            echo "VERSION=latest" >> $GITHUB_OUTPUT
+          fi
+          echo "Branch/tag: ${{ steps.extract_branch.outputs.VERSION }}"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -43,13 +54,6 @@ jobs:
       - name: Log in to ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -67,7 +71,4 @@ jobs:
           build-args: |
             GIT_SHA=${{ github.sha }}
           tags: |
-            ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
-            ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ steps.get_version.outputs.VERSION }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:latest
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:${{ steps.get_version.outputs.VERSION }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:${{ steps.extract_branch.outputs.VERSION }}

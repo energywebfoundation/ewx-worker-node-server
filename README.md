@@ -48,16 +48,18 @@ If you would like to proceed with Blockchain-setup now go to [Blockchain Account
 
 ---
 
-### 1. Prepare Infura IPFS api credentials
+### 1. Prepare IPFS
 
-Worker Node gets solutions Worklogic NodeRed flow files from IPFS (Inter Planetary File System).
+Worker Node gets solutions Worklogic NodeRed flow files from [IPFS (Inter Planetary File System)](https://ipfs.tech).
 Hence, if solutions you intend to run are stored in IPFS, you need to configure proper credentials.
 
-`> Only Infura IPFS is supported`
+By default it's configured to `ipfs.io` so there is no configuration required but if you experience any issues with that you can switch to different [IPFS Gateway](https://ipfs.github.io/public-gateway-checker/).
 
-1. Sign up to https://www.infura.io/ if you do not have an account.
-2. Use an existing API key, or create a new one.
-3. Get API key and secret to be set as environment variables
+In order to make it work you need to modify `IPFS_URL` environment variable with one of the gateways.
+
+#### 1.1 Infura IPFS
+
+It's possible to use it with Infura IPFS, in order to do that provide `IPFS_API_KEY` and `IPFS_SECRET_KEY`. Change `IPFS_URL` to `https://ipfs.infura.io:5001` and set `IPFS_CONTEXT_PATH` to `/api/v0/cat?arg=`.
 
 **If you intend to ONLY run Solutions that have their WorkLogic stored locally, you can configure any dummy values for IPFS**.
 

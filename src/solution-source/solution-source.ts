@@ -33,13 +33,13 @@ const getSolutionSmartFlow = async (rawWorklogic: string): Promise<any | null> =
     const worklogicId = hasProtocol[2];
 
     if (protocol === 'ipfs') {
-      return await downloadSolution(
-        MAIN_CONFIG.IPFS_API_KEY,
-        MAIN_CONFIG.IPFS_SECRET_KEY,
-        MAIN_CONFIG.IPFS_URL,
-        MAIN_CONFIG.IPFS_CONTEXT_PATH,
-        worklogicId,
-      );
+      return await downloadSolution({
+        ipfsApiKey: MAIN_CONFIG.IPFS_API_KEY,
+        ipfsSecretKey: MAIN_CONFIG.IPFS_SECRET_KEY,
+        ipfsUrl: MAIN_CONFIG.IPFS_URL,
+        ipfsContextPath: MAIN_CONFIG.IPFS_CONTEXT_PATH,
+        solutionWorklogic: worklogicId,
+      });
     } else if (protocol === 'local') {
       return localRead(worklogicId);
     } else {
@@ -47,13 +47,13 @@ const getSolutionSmartFlow = async (rawWorklogic: string): Promise<any | null> =
     }
   }
 
-  return await downloadSolution(
-    MAIN_CONFIG.IPFS_API_KEY,
-    MAIN_CONFIG.IPFS_SECRET_KEY,
-    MAIN_CONFIG.IPFS_URL,
-    MAIN_CONFIG.IPFS_CONTEXT_PATH,
-    rawWorklogic,
-  );
+  return await downloadSolution({
+    ipfsApiKey: MAIN_CONFIG.IPFS_API_KEY,
+    ipfsSecretKey: MAIN_CONFIG.IPFS_SECRET_KEY,
+    ipfsUrl: MAIN_CONFIG.IPFS_URL,
+    ipfsContextPath: MAIN_CONFIG.IPFS_CONTEXT_PATH,
+    solutionWorklogic: rawWorklogic,
+  });
 };
 
 const validateMessage = (data: { label: string; nodes: string }, derivedLogger): boolean => {

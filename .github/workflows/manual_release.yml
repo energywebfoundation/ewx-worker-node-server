@@ -26,7 +26,7 @@ jobs:
             echo "BRANCH=${{ github.head_ref }}" >> $GITHUB_OUTPUT
           fi
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.set_branch.outputs.BRANCH }}
       - name: Configure AWS Credentials

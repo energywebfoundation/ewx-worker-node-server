@@ -14,7 +14,7 @@ env:
 
 jobs:
   build-and-push:
-    runs-on:  ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ewf-runner-docker
     timeout-minutes: 5
     steps:
       - name: Set branch

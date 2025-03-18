@@ -13,6 +13,7 @@ import { createLogger, createReadPalletApi } from './util';
 import { createConfigRouter } from './worker-config';
 import { retryHttpAsyncCall } from './polkadot/polka';
 import { startHeartbeat } from './heartbeat';
+import { registerWorker } from './registry';
 
 void (async () => {
   setAppState(APP_BOOTSTRAP_STATUS.STARTED);
@@ -62,6 +63,8 @@ void (async () => {
   setAppState(APP_BOOTSTRAP_STATUS.PERFORMED_CHECKS);
 
   logger.info('connected to chain');
+
+  await registerWorker(account);
 
   await startRedServer(app);
 

@@ -21,6 +21,7 @@ type EWX_ENVS =
   | 'EWX_SOLUTION_GROUP_ID'
   | 'EWX_WORKLOGIC_ID'
   | 'EWX_RPC_URL'
+  | 'BASE_URL'
   | 'EWX_SQLITE_PATH'
   | 'EWX_WORKER_ADDRESS';
 
@@ -43,7 +44,13 @@ export const startRedServer = async (app: express.Express): Promise<void> => {
           levelComparison: 'DESC',
         });
 
-        return function (msg: { level: number; msg: string; z?: string }) {
+        return function (msg: {
+          level: number;
+          msg: string;
+          z?: string;
+          type?: string;
+          id?: string;
+        }) {
           const logLevel: string | undefined = REVERSED_NODE_RED_LOG_LEVELS[msg.level];
 
           const cached: string | undefined = getNodeRedSolutionNamespace(msg.z);
@@ -67,7 +74,10 @@ export const startRedServer = async (app: express.Express): Promise<void> => {
           }
 
           if (cached != null) {
-            logger[logLevel]({ solutionNamespace: cached }, msg.msg);
+            logger[logLevel](
+              { solutionNamespace: cached, flow: msg.z, type: msg.type, id: msg.id },
+              msg.msg,
+            );
           } else {
             logger[logLevel]({}, msg.msg);
           }
@@ -144,7 +154,13 @@ export const runtimeStarted = async (maxAttempts: number = 10): Promise<boolean>
 
     // Hacky way of testing if runtime is started - if it returns null, it means runtime has not started
     // if it returns anything else, it means that it started
-    const flows = await RED.runtime.flows.getFlows({});
+    const flows = await RED.runtime.flows.getFlows({}).catch((e: Error) => {
+      if (e?.message === "Cannot read properties of undefined (reading 'log')") {
+        return null;
+      }
+
+      throw e;
+    });
 
     runtimeStarted = flows !== null;
 
@@ -476,6 +492,11 @@ export const modifyFlowIds = (
     },
     {
       type: 'str',
+      name: 'BASE_URL',
+      value: MAIN_CONFIG.BASE_URLS,
+    },
+    {
+      type: 'str',
       name: 'EWX_RPC_URL',
       value: MAIN_CONFIG.PALLET_RPC_URL,
     },
@@ -501,6 +522,7 @@ export const modifyFlowIds = (
         EWX_SQLITE_PATH: sqlitePath,
         EWX_WORKER_ADDRESS: workerAddress,
         EWX_RPC_URL: MAIN_CONFIG.PALLET_RPC_URL,
+        BASE_URL: MAIN_CONFIG.BASE_URLS,
       },
     };
   });
@@ -515,6 +537,7 @@ export const modifyFlowIds = (
         EWX_SQLITE_PATH: sqlitePath,
         EWX_WORKER_ADDRESS: workerAddress,
         EWX_RPC_URL: MAIN_CONFIG.PALLET_RPC_URL,
+        BASE_URL: MAIN_CONFIG.BASE_URLS,
       },
     };
   });

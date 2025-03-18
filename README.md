@@ -88,8 +88,7 @@ You can read more about the environment variables [here](docs/env-vars.md).
    ```
 
 2. Replace `<SEED>` under the `VOTING_WORKER_SEED` key with your Worker Account Seed. Keep in mind that your Worker Account have to be different thatn Operator Account. If you havent done it already, to generate Worker Node account you can use any of the wallets mentioned in official [Polkadot Docs](https://wiki.polkadot.network/docs/wallets-and-extensions)
-3. Replace `<infura_ipfs_APIKEY>` & `<infura_ipfs_APISECRET>` with your infura API key and secret
-4. Optionally, you can change `PRETTY_PRINT` to `true` or `false` depending on your use case.
+3. Optionally, you can change `PRETTY_PRINT` to `true` or `false` depending on your use case.
 
 ---
 
@@ -110,8 +109,6 @@ docker compose up
 ```
 
 #### **Using Helm + Kubernetes:**
-
-`> Make sure SEED, ipfs_APIKEY & ipfs_APISECRET are also replaced in ./helm-chart/values.yaml`
 
 ```bash
 helm install ewx-workers-node-service -f helm-chart/values.yaml oci://ghcr.io/energywebfoundation/generic-microservice-helm  -n ewx

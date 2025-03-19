@@ -30,6 +30,7 @@ ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 RUN rm skipcache
 RUN echo "{\"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\", \"gitSha\": \"$GIT_SHA\"}" > build.json
 
+RUN chown -R node:node /app
 USER node
 
 CMD ["node", "--enable-source-maps", "main.js"]

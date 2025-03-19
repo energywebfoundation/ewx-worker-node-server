@@ -88,6 +88,8 @@ jobs:
           file: Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
+          build-args:
+            GIT_SHA=${{ github.sha }}
           tags: |
             ghcr.io/${{ github.repository }}/ewx-worker-node-server:latest
             ghcr.io/${{ github.repository }}/ewx-worker-node-server:${{ needs.release-module.outputs.new_version }}

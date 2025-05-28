@@ -24,11 +24,9 @@ ENV NO_COLOR=true
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./
 
-ARG GIT_SHA=no-gitsha-provided
-
-ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
-RUN rm skipcache
-RUN echo "{\"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\", \"gitSha\": \"$GIT_SHA\"}" > build.json
+ARG GIT_SHA
+ARG VERSION
+RUN echo "{\"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\", \"gitSha\": \"$GIT_SHA\", \"version\": \"$VERSION\"}" > build.json
 
 RUN chown -R node:node /app
 USER node

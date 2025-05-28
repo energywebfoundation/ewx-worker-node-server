@@ -55,6 +55,10 @@ export const retryHttpAsyncCall = async <T>(
     try {
       return await call();
     } catch (e) {
+      if(e.message === 'FATAL: Unable to initialize the API: [502]: Bad Gateway') {
+        return retry(e);
+      }
+
       if (e.message === 'FATAL: Unable to initialize the API: fetch failed') {
         return retry(e);
       }

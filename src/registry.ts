@@ -6,6 +6,7 @@ import promiseRetry from 'promise-retry';
 import { u8aToHex } from '@polkadot/util';
 import { createToken } from './auth/login';
 import { type ApiPromise } from '@polkadot/api';
+import { AppVersion } from './version';
 
 const logger = createLogger('WorkersRegistry');
 
@@ -89,6 +90,8 @@ const storeWorkerInRegistry = async (token: string, account: KeyringPair): Promi
       {
         headers: {
           Authorization: `Bearer ${token}`,
+          'x-worker-version': AppVersion.version,
+          'x-worker-source': 'WNS',
         },
       },
     )

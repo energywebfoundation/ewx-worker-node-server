@@ -35,7 +35,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release_branches: master
           custom_release_rules: major:major:Major Changes,minor:minor:Minor Changes,chore:patch:Chores
-          
+
       - name: Create a GitHub release
         uses: ncipollo/release-action@v1
         if: github.ref == 'refs/heads/master'
@@ -90,7 +90,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: |
             GIT_SHA=${{ github.sha }}
-            VERSION=${{ needs.release-module.outputs.new_version }}          
+            VERSION=${{ needs.release-module.outputs.new_version }}
           tags: |
             ghcr.io/${{ github.repository }}/ewx-worker-node-server:latest
             ghcr.io/${{ github.repository }}/ewx-worker-node-server:${{ needs.release-module.outputs.new_version }}

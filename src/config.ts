@@ -77,7 +77,7 @@ export const ENV_SCHEMA = z.object({
   SQLITE_BASE_PATH: z.string().default('./sqlite').describe('Base SQLite path.'),
   IPFS_API_KEY: z.string().nullable().default(null).describe('IPFS API Key'),
   IPFS_SECRET_KEY: z.string().nullable().default(null).describe('IPFS Secret Key'),
-  IPFS_URL: z.string().default('https://ipfs.io').describe('IPFS Url'),
+  IPFS_URL: z.string().default('https://workers-registry.energyweb.org').describe('IPFS BASE Url'),
   IPFS_CONTEXT_PATH: z.string().default('/ipfs/').describe('IPFS Context Path'),
   IPFS_USER_AGENT_VALUE: z
     .string()
@@ -130,6 +130,7 @@ export const ENV_SCHEMA = z.object({
     .url()
     .default('https://marketplace-cdn.energyweb.org/base_urls.json')
     .describe('Base URLs of EWX resources'),
+  BUILD_METADATA_PATH: z.string().default('./build.json').describe('Path to build metadata file'),
 });
 
 export const MAIN_CONFIG: z.infer<typeof ENV_SCHEMA> = (process.env.__SKIP_PARSE_CONFIG === 'true'

@@ -77,7 +77,7 @@ export const ENV_SCHEMA = z.object({
   SQLITE_BASE_PATH: z.string().default('./sqlite').describe('Base SQLite path.'),
   IPFS_API_KEY: z.string().nullable().default(null).describe('IPFS API Key'),
   IPFS_SECRET_KEY: z.string().nullable().default(null).describe('IPFS Secret Key'),
-  IPFS_URL: z.string().default('https://workers-registry.energyweb.org').describe('IPFS BASE Url'),
+  IPFS_URL: z.string().default('https://workers-registry.energywebx.com').describe('IPFS BASE Url'),
   IPFS_CONTEXT_PATH: z.string().default('/ipfs/').describe('IPFS Context Path'),
   IPFS_USER_AGENT_VALUE: z
     .string()

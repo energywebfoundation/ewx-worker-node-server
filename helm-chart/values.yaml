@@ -46,7 +46,7 @@ image:
     enabled: false
 
 env:
-  PALLET_RPC_URL: https://public-rpc.mainnet.energywebx.com
+  PALLET_RPC_URL: https://wns-rpc.mainnet.energywebx.com
   VOTING_RPC_URL: https://wns-rpc.mainnet.energywebx.com
   WORKER_REGISTRY_URL: 'https://workers-registry.energywebx.com'
   PALLET_AUTH_SERVER_DOMAIN: 'default'

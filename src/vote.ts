@@ -22,6 +22,7 @@ const queue: queueAsPromised<VoteTask> = fastq.promise(asyncWorker, 4);
 
 const DELAY_TIMER: number = 30 * 1000;
 const NINE_MINUTES = 540000;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 const voteQueueLogger = createLogger('VoteQueue');
 
@@ -43,11 +44,11 @@ setInterval(() => {
   const current = Date.now();
 
   voteStorage.forEach(({ createdAt }, key) => {
-    if (Math.floor(createdAt / 1000) + 86400 <= current) {
+    if (createdAt + ONE_DAY_MS <= current) {
       voteStorage.delete(key);
     }
   });
-}, 20000);
+}, 5000);
 
 export const createVoteRouter = (): express.Router => {
   const voteRouter = express.Router({ mergeParams: true });

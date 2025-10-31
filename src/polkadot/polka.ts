@@ -169,9 +169,10 @@ export const submitSolutionResult = async (
   namespace: string,
   nodeHash: string,
   votingRoundId: string,
-  loopTimeMiliseconds = 3000,
+  loopTimeMiliseconds: number,
+  noHashVote: boolean,
 ): Promise<string | null> => {
-  const resultHash = blake2AsHex(nodeHash);
+  const resultHash = noHashVote ? nodeHash : blake2AsHex(nodeHash);
   const signature = account.sign(resultHash);
 
   const utx = api.tx.workerNodePallet.submitSolutionResult(

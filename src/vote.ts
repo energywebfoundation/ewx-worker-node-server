@@ -16,6 +16,7 @@ interface VoteTask {
   startedAt: number;
   solutionNamespace: string;
   voteIdentifier: string | null;
+  noHashVote: boolean;
 }
 
 const queue: queueAsPromised<VoteTask> = fastq.promise(asyncWorker, 4);
@@ -82,6 +83,11 @@ export const createVoteRouter = (): express.Router => {
         throw new Error('noderedId is required in body');
       }
 
+      // check if noHashVote is true and root is longer than 32 bytes
+      if ((req.body.noHashVote as boolean) && Buffer.byteLength(req.body.root as string, 'utf8') > 32) {
+        throw new Error('if not hashing the root it must be no longer than 32 bytes');
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const solutionNamespace: string | null = await getSolutionNamespace(req.body.noderedId);
 
@@ -98,6 +104,7 @@ export const createVoteRouter = (): express.Router => {
         noderedId: req.body.noderedId,
         nodeHash: req.body.root,
         solutionNamespace,
+        noHashVote: req.body.noHashVote ?? false,
       };
 
       try {
@@ -171,6 +178,8 @@ async function processVoteQueue(task: VoteTask): Promise<void> {
     task.solutionNamespace,
     task.nodeHash,
     task.votingRoundId,
+    3000,
+    task.noHashVote,
   )
     .then((hash: string | null) => {
       if (task.voteIdentifier != null) {

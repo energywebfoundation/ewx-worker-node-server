@@ -8,16 +8,37 @@ import * as fastq from 'fastq';
 import { createLogger, createWritePalletApi, sleep } from './util';
 import { MAIN_CONFIG } from './config';
 import { submitSolutionResult } from './polkadot/polka';
+import { z } from 'zod';
 
 interface VoteTask {
   votingRoundId: string;
   noderedId: string;
-  nodeHash: string;
+  vote: string;
   startedAt: number;
   solutionNamespace: string;
   voteIdentifier: string | null;
-  hashRoot: boolean;
+  hashVote: boolean;
 }
+
+const SUBMIT_VOTE_SCHEMA = z
+  .object({
+    id: z.string(),
+    noderedId: z.string(),
+    root: z.string(),
+    hashVote: z.boolean().optional().default(true),
+  })
+  .refine(
+    (data) => {
+      if (!data.hashVote) {
+        return Buffer.byteLength(data.root, 'utf8') <= 32;
+      }
+      return true;
+    },
+    {
+      message: 'if not hashing the vote it must be no longer than 32 bytes',
+      path: ['root'],
+    },
+  );
 
 const queue: queueAsPromised<VoteTask> = fastq.promise(asyncWorker, 4);
 
@@ -79,25 +100,9 @@ export const createVoteRouter = (): express.Router => {
   voteRouter.post(
     '/sse/:id',
     asyncHandler(async (req, res) => {
-      if (req.body.noderedId == null) {
-        throw new Error('noderedId is required in body');
-      }
+      const { hashVote, id, noderedId, root} = SUBMIT_VOTE_SCHEMA.parse(req.body);
 
-      // check if hashRoot is a boolean or undefined
-      if (typeof req.body.hashRoot !== 'boolean' && req.body.hashRoot !== undefined) {
-        throw new Error('hashRoot must be a boolean or undefined');
-      }
-
-      // check if noHashVote is true and root is longer than 32 bytes
-      if (
-        (req.body.noHashVote as boolean) &&
-        Buffer.byteLength(req.body.root as string, 'utf8') > 32
-      ) {
-        throw new Error('if not hashing the root it must be no longer than 32 bytes');
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      const solutionNamespace: string | null = await getSolutionNamespace(req.body.noderedId);
+      const solutionNamespace: string | null = await getSolutionNamespace(noderedId);
 
       if (solutionNamespace == null) {
         voteQueueLogger.error({ solutionNamespace }, 'solution is not present in nodered');
@@ -108,11 +113,11 @@ export const createVoteRouter = (): express.Router => {
       }
 
       const payload = {
-        votingRoundId: req.body.id,
-        noderedId: req.body.noderedId,
-        nodeHash: req.body.root,
+        votingRoundId: id,
+        noderedId,
+        vote: root,
         solutionNamespace,
-        hashRoot: req.body.hashRoot ?? true,
+        hashVote,
       };
 
       try {
@@ -184,10 +189,10 @@ async function processVoteQueue(task: VoteTask): Promise<void> {
     api,
     account,
     task.solutionNamespace,
-    task.nodeHash,
+    task.vote,
     task.votingRoundId,
     3000,
-    task.hashRoot,
+    task.hashVote,
   )
     .then((hash: string | null) => {
       if (task.voteIdentifier != null) {

@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to build and release'
+        description: "Branch to build and release"
         required: true
-        default: 'master'
+        default: "master"
       tag:
-        description: 'Tag to build and release'
+        description: "Tag to build and release"
         required: true
 
 env:
@@ -17,7 +17,7 @@ env:
 
 jobs:
   build-and-push:
-    runs-on: ewf-runner-docker
+    runs-on: "ubuntu-latest"
     timeout-minutes: 5
     steps:
       - name: Set branch

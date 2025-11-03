@@ -16,7 +16,7 @@ interface VoteTask {
   startedAt: number;
   solutionNamespace: string;
   voteIdentifier: string | null;
-  noHashVote: boolean;
+  hashRoot: boolean;
 }
 
 const queue: queueAsPromised<VoteTask> = fastq.promise(asyncWorker, 4);
@@ -83,8 +83,16 @@ export const createVoteRouter = (): express.Router => {
         throw new Error('noderedId is required in body');
       }
 
+      // check if hashRoot is a boolean or undefined
+      if (typeof req.body.hashRoot !== 'boolean' && req.body.hashRoot !== undefined) {
+        throw new Error('hashRoot must be a boolean or undefined');
+      }
+
       // check if noHashVote is true and root is longer than 32 bytes
-      if ((req.body.noHashVote as boolean) && Buffer.byteLength(req.body.root as string, 'utf8') > 32) {
+      if (
+        (req.body.noHashVote as boolean) &&
+        Buffer.byteLength(req.body.root as string, 'utf8') > 32
+      ) {
         throw new Error('if not hashing the root it must be no longer than 32 bytes');
       }
 
@@ -104,7 +112,7 @@ export const createVoteRouter = (): express.Router => {
         noderedId: req.body.noderedId,
         nodeHash: req.body.root,
         solutionNamespace,
-        noHashVote: req.body.noHashVote ?? false,
+        hashRoot: req.body.hashRoot ?? true,
       };
 
       try {
@@ -179,7 +187,7 @@ async function processVoteQueue(task: VoteTask): Promise<void> {
     task.nodeHash,
     task.votingRoundId,
     3000,
-    task.noHashVote,
+    task.hashRoot,
   )
     .then((hash: string | null) => {
       if (task.voteIdentifier != null) {

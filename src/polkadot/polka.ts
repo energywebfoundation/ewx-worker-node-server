@@ -167,12 +167,12 @@ export const submitSolutionResult = async (
   api: ApiPromise,
   account: KeyringPair,
   namespace: string,
-  nodeHash: string,
+  root: string,
   votingRoundId: string,
   loopTimeMiliseconds: number,
-  noHashVote: boolean,
+  hashRoot: boolean,
 ): Promise<string | null> => {
-  const resultHash = noHashVote ? nodeHash : blake2AsHex(nodeHash);
+  const resultHash = hashRoot ? blake2AsHex(root) : root;
   const signature = account.sign(resultHash);
 
   const utx = api.tx.workerNodePallet.submitSolutionResult(

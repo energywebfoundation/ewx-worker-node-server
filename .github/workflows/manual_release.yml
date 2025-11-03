@@ -1,4 +1,4 @@
-name: Build and Release to ECR
+name: Build and Release to ECR and ghcr.io
 
 on:
   workflow_dispatch:
@@ -20,22 +20,16 @@ jobs:
     runs-on: "ubuntu-latest"
     timeout-minutes: 5
     steps:
-      - name: Set branch
-        id: set_branch
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "BRANCH=${{ github.event.inputs.branch }}" >> $GITHUB_OUTPUT
-          else
-            echo "BRANCH=${{ github.head_ref }}" >> $GITHUB_OUTPUT
-          fi
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.set_branch.outputs.BRANCH }}
-      - name: Configure AWS Credentials
+          ref: ${{ github.event.inputs.branch }}
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
           mask-aws-account-id: true
       - name: Log in to ECR
         id: login-ecr

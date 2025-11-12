@@ -1,14 +1,14 @@
-import { type ApiPromise, Keyring } from '@polkadot/api';
+import { Keyring } from '@polkadot/api';
+import { type KeyringPair } from '@polkadot/keyring/types';
 import express from 'express';
 import asyncHandler from 'express-async-handler';
-import { getSolutionNamespace } from './node-red/red';
-import { type KeyringPair } from '@polkadot/keyring/types';
 import type { queueAsPromised } from 'fastq';
 import * as fastq from 'fastq';
-import { createLogger, createWritePalletApi, sleep } from './util';
-import { MAIN_CONFIG } from './config';
-import { submitSolutionResult } from './polkadot/polka';
 import { z } from 'zod';
+import { MAIN_CONFIG } from './config';
+import { getSolutionNamespace } from './node-red/red';
+import { retryHttpAsyncCall, submitSolutionResult } from './polkadot/polka';
+import { createEwxTxManager, createLogger, sleep } from './util';
 
 interface VoteTask {
   votingRoundId: string;
@@ -41,6 +41,8 @@ const SUBMIT_VOTE_SCHEMA = z
   );
 
 const queue: queueAsPromised<VoteTask> = fastq.promise(asyncWorker, 4);
+
+const ewxTxManager = createEwxTxManager();
 
 const DELAY_TIMER: number = 30 * 1000;
 const NINE_MINUTES = 540000;
@@ -100,7 +102,7 @@ export const createVoteRouter = (): express.Router => {
   voteRouter.post(
     '/sse/:id',
     asyncHandler(async (req, res) => {
-      const { hashVote, id, noderedId, root} = SUBMIT_VOTE_SCHEMA.parse(req.body);
+      const { hashVote, id, noderedId, root } = SUBMIT_VOTE_SCHEMA.parse(req.body);
 
       const solutionNamespace: string | null = await getSolutionNamespace(noderedId);
 
@@ -178,23 +180,24 @@ async function processVoteQueue(task: VoteTask): Promise<void> {
     base: task,
   });
 
-  const api: ApiPromise = await createWritePalletApi();
   const keyring = new Keyring({ type: 'sr25519' });
 
   const account: KeyringPair = keyring.addFromMnemonic(MAIN_CONFIG.VOTING_WORKER_SEED);
 
   tempLogger.info('attempting to send vote');
 
-  await submitSolutionResult(
-    api,
-    account,
-    task.solutionNamespace,
-    task.vote,
-    task.votingRoundId,
-    3000,
-    task.hashVote,
+  await retryHttpAsyncCall(
+    async () =>
+      await submitSolutionResult(
+        ewxTxManager,
+        account,
+        task.solutionNamespace,
+        task.vote,
+        task.votingRoundId,
+        task.hashVote,
+      ),
   )
-    .then((hash: string | null) => {
+    .then((hash) => {
       if (task.voteIdentifier != null) {
         voteStorage.set(task.voteIdentifier, {
           createdAt: Date.now(),
@@ -212,19 +215,16 @@ async function processVoteQueue(task: VoteTask): Promise<void> {
       tempLogger.flush();
     })
     .catch(async (e) => {
+      // EWX Error - (some) http errors are handled in retryHttpAsyncCall fn
       tempLogger.error(
         {
           task,
         },
-        'failed to submit solution result',
+        'failed to submit solution result - voting wont be retried',
       );
       tempLogger.error(e);
       tempLogger.flush();
 
-      await api.disconnect();
-
-      throw e;
+      // We do not throw for these kind of errors so we can continue processing
     });
-
-  await api.disconnect();
 }

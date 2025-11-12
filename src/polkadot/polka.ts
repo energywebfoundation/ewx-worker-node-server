@@ -1,13 +1,13 @@
 import { ApiPromise, HttpProvider } from '@polkadot/api';
-import { blake2AsHex, cryptoWaitReady } from '@polkadot/util-crypto';
-import { Tuple, u128, u32 } from '@polkadot/types-codec';
 import { type KeyringPair } from '@polkadot/keyring/types';
-import { type Solution, type SolutionGroup } from './polka-types';
-import pino from 'pino';
+import { Tuple, u128, u32 } from '@polkadot/types-codec';
 import { stringToU8a, u8aConcat, u8aToHex } from '@polkadot/util';
+import { blake2AsHex, cryptoWaitReady } from '@polkadot/util-crypto';
+import pino from 'pino';
 import promiseRetry from 'promise-retry';
 import { type WrapOptions } from 'retry';
-import { sleep } from '../util';
+import type { EwxTxManager } from '../ewx-tx-manager';
+import { type Solution, type SolutionGroup } from './polka-types';
 
 export type WorkerAddress = string;
 export type OperatorAddress = string;
@@ -164,69 +164,27 @@ export const getOperatorSubscriptions = async (
 };
 
 export const submitSolutionResult = async (
-  api: ApiPromise,
+  txManager: EwxTxManager,
   account: KeyringPair,
   namespace: string,
   vote: string,
   votingRoundId: string,
-  loopTimeMiliseconds: number,
   hashVote: boolean,
 ): Promise<string | null> => {
   const finalVote = hashVote ? blake2AsHex(vote) : vote;
   const signature = account.sign(finalVote as string | Uint8Array<ArrayBufferLike>);
 
-  const utx = api.tx.workerNodePallet.submitSolutionResult(
-    namespace,
-    votingRoundId,
-    finalVote,
-    signature,
-    account.publicKey,
+  const { txHash } = await txManager.sendWithoutSigning((api) =>
+    api.tx.workerNodePallet.submitSolutionResult(
+      namespace,
+      votingRoundId,
+      finalVote,
+      signature,
+      account.publicKey,
+    ),
   );
 
-  const transactionHash: string | null = await new Promise(
-    // eslint-disable-next-line no-async-promise-executor,@typescript-eslint/no-misused-promises
-    async (resolve, reject) => {
-      let counter = 0;
-      let check = true;
-      const BLOCK_HEADER_MAX: number = 12 * 5;
-
-      await utx
-        .send(async (data) => {
-          while (check) {
-            if (counter >= BLOCK_HEADER_MAX) {
-              resolve(null);
-            }
-
-            const signedBlock = await api.rpc.chain.getBlock().catch(() => undefined);
-
-            if (signedBlock == null) {
-              continue;
-            }
-
-            const lastHdr = signedBlock.block.header;
-            const extrinsicHash = data.toHuman();
-
-            await Promise.allSettled(
-              signedBlock.block.extrinsics.map(async (ex) => {
-                if (extrinsicHash === ex.hash.toHex()) {
-                  resolve(lastHdr.hash.toHex());
-
-                  check = false;
-                }
-              }),
-            );
-            await sleep(loopTimeMiliseconds);
-
-            counter = counter + 1;
-          }
-        })
-        .catch((e) => {
-          reject(e);
-        });
-    },
-  );
-
-  return transactionHash;
+  return txHash;
 };
 
 export const queryStake = async (

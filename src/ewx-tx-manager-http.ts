@@ -2,7 +2,6 @@
 /**
  * @source @energywebfoundation/generic-green-proofs-ewx-module
  */
-
 import { ApiPromise, HttpProvider, type Keyring } from '@polkadot/api';
 import { setTimeout } from 'timers/promises';
 
@@ -11,6 +10,7 @@ import { type Any, EwxTxManager, type SendTxResult } from './ewx-tx-manager.js';
 export type EwxHttpTxManagerOptions = {
   /** How many blocks to wait (to find transaction registered) before failing */
   waitBlockNumber: number;
+  debug: boolean;
 };
 
 export class EwxHttpTxManager extends EwxTxManager {
@@ -23,6 +23,7 @@ export class EwxHttpTxManager extends EwxTxManager {
 
     this.options = {
       waitBlockNumber: options.waitBlockNumber ?? 10,
+      debug: options.debug ?? false,
     };
 
     this.provider = new HttpProvider(rpcUrl.href);
@@ -129,17 +130,35 @@ export class EwxHttpTxManager extends EwxTxManager {
     let blockToCheck = startingBlockNumber;
 
     while (startingBlockNumber + this.options.waitBlockNumber > blockToCheck) {
+      this.debugLog(`Checking block number ${blockToCheck}. Looking for txHash=${txHash}`);
+
       const blockHash = await api.rpc.chain.getBlockHash(blockToCheck);
 
       if (
         blockHash.toHex() === '0x0000000000000000000000000000000000000000000000000000000000000000'
       ) {
-        // Block not ready yet, wait
+        this.debugLog(`Block ${blockToCheck} not ready`);
+        await setTimeout(2000);
+        continue;
+      }
+
+      // We should check extrinsics ONLY on finalized blocks
+      // In case of parachain if block is not finalized then its list of extrinsics can change
+      const finalizedBlockNumber = await this.getCurrentFinalizedBlockNumber(api);
+      if (finalizedBlockNumber < blockToCheck) {
+        this.debugLog(
+          `Block ${blockToCheck} is not finalized yet (latest finalized: ${finalizedBlockNumber})`,
+        );
         await setTimeout(2000);
         continue;
       }
 
       const signedBlock = await api.rpc.chain.getBlock(blockHash);
+
+      this.debugLog(
+        'Found extrinsics hashes',
+        signedBlock.block.extrinsics.map((ex) => ex.hash.toHex()),
+      );
 
       const matchingExtrinsicIndex = signedBlock.block.extrinsics.findIndex((ex) => {
         return ex.hash.toHex() === txHash;
@@ -166,5 +185,19 @@ export class EwxHttpTxManager extends EwxTxManager {
     const blockNumber = header.number.toNumber();
 
     return blockNumber;
+  }
+
+  private async getCurrentFinalizedBlockNumber(api: ApiPromise): Promise<number> {
+    const finalizedBlockHash = await api.rpc.chain.getFinalizedHead();
+    const finalizedBlock = await api.rpc.chain.getBlock(finalizedBlockHash);
+
+    return finalizedBlock.block.header.number.toNumber();
+  }
+
+  private debugLog(...log: unknown[]) {
+    if (this.options.debug === true) {
+      // eslint-disable-next-line no-console
+      console.log(...log);
+    }
   }
 }

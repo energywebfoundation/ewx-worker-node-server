@@ -1,6 +1,8 @@
 import { type ApiPromise } from '@polkadot/api';
-import { MAIN_CONFIG } from './config';
 import pino, { type Logger, type LoggerOptions } from 'pino';
+import { MAIN_CONFIG } from './config';
+import type { EwxTxManager } from './ewx-tx-manager';
+import { EwxHttpTxManager } from './ewx-tx-manager-http';
 import { createApi, retryHttpAsyncCall } from './polkadot/polka';
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -26,6 +28,10 @@ export const createWritePalletApi = async (): Promise<ApiPromise> => {
   const votingRpcUrl: string = MAIN_CONFIG.VOTING_RPC_URL;
 
   return await retryHttpAsyncCall(async () => await createApi(votingRpcUrl));
+};
+
+export const createEwxTxManager = (): EwxTxManager => {
+  return new EwxHttpTxManager(new URL(MAIN_CONFIG.VOTING_RPC_URL));
 };
 
 export const createLogger = (options: string | LoggerOptions): Logger => {

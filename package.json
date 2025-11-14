@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@energyweb/node-red-contrib-energywebx": "0.7.2",
-    "@energyweb/node-red-contrib-green-proof-worker": "1.1.3",
+    "@energyweb/node-red-contrib-green-proof-worker": "2.4.1",
     "@polkadot/api": "14.0.1",
     "axios": "1.7.9",
     "dotenv": "16.4.7",

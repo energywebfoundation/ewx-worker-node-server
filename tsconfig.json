@@ -12,11 +12,11 @@
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "target": "es2015",
+    "target": "es2022",
     "module": "commonjs",
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "lib": ["es2020", "dom"]
+    "lib": ["es2022", "dom"]
   },
   "include": ["src/*.ts"],
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]

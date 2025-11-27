@@ -1,24 +1,48 @@
-import { type ApiPromise, Keyring } from '@polkadot/api';
+import { Keyring } from '@polkadot/api';
+import { type KeyringPair } from '@polkadot/keyring/types';
 import express from 'express';
 import asyncHandler from 'express-async-handler';
-import { getSolutionNamespace } from './node-red/red';
-import { type KeyringPair } from '@polkadot/keyring/types';
 import type { queueAsPromised } from 'fastq';
 import * as fastq from 'fastq';
-import { createLogger, createWritePalletApi, sleep } from './util';
+import { z } from 'zod';
 import { MAIN_CONFIG } from './config';
-import { submitSolutionResult } from './polkadot/polka';
+import { getSolutionNamespace } from './node-red/red';
+import { retryHttpAsyncCall, submitSolutionResult } from './polkadot/polka';
+import { createEwxTxManager, createLogger, sleep } from './util';
 
 interface VoteTask {
   votingRoundId: string;
   noderedId: string;
-  nodeHash: string;
+  vote: string;
   startedAt: number;
   solutionNamespace: string;
   voteIdentifier: string | null;
+  hashVote: boolean;
 }
 
+const SUBMIT_VOTE_SCHEMA = z
+  .object({
+    id: z.string(),
+    noderedId: z.string(),
+    root: z.string(),
+    hashVote: z.boolean().optional().default(true),
+  })
+  .refine(
+    (data) => {
+      if (!data.hashVote) {
+        return Buffer.byteLength(data.root, 'utf8') <= 32;
+      }
+      return true;
+    },
+    {
+      message: 'if not hashing the vote it must be no longer than 32 bytes',
+      path: ['root'],
+    },
+  );
+
 const queue: queueAsPromised<VoteTask> = fastq.promise(asyncWorker, 4);
+
+const ewxTxManager = createEwxTxManager();
 
 const DELAY_TIMER: number = 30 * 1000;
 const NINE_MINUTES = 540000;
@@ -78,12 +102,9 @@ export const createVoteRouter = (): express.Router => {
   voteRouter.post(
     '/sse/:id',
     asyncHandler(async (req, res) => {
-      if (req.body.noderedId == null) {
-        throw new Error('noderedId is required in body');
-      }
+      const { hashVote, id, noderedId, root } = SUBMIT_VOTE_SCHEMA.parse(req.body);
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      const solutionNamespace: string | null = await getSolutionNamespace(req.body.noderedId);
+      const solutionNamespace: string | null = await getSolutionNamespace(noderedId);
 
       if (solutionNamespace == null) {
         voteQueueLogger.error({ solutionNamespace }, 'solution is not present in nodered');
@@ -94,10 +115,11 @@ export const createVoteRouter = (): express.Router => {
       }
 
       const payload = {
-        votingRoundId: req.body.id,
-        noderedId: req.body.noderedId,
-        nodeHash: req.body.root,
+        votingRoundId: id,
+        noderedId,
+        vote: root,
         solutionNamespace,
+        hashVote,
       };
 
       try {
@@ -158,21 +180,24 @@ async function processVoteQueue(task: VoteTask): Promise<void> {
     base: task,
   });
 
-  const api: ApiPromise = await createWritePalletApi();
   const keyring = new Keyring({ type: 'sr25519' });
 
   const account: KeyringPair = keyring.addFromMnemonic(MAIN_CONFIG.VOTING_WORKER_SEED);
 
   tempLogger.info('attempting to send vote');
 
-  await submitSolutionResult(
-    api,
-    account,
-    task.solutionNamespace,
-    task.nodeHash,
-    task.votingRoundId,
+  await retryHttpAsyncCall(
+    async () =>
+      await submitSolutionResult(
+        ewxTxManager,
+        account,
+        task.solutionNamespace,
+        task.vote,
+        task.votingRoundId,
+        task.hashVote,
+      ),
   )
-    .then((hash: string | null) => {
+    .then((hash) => {
       if (task.voteIdentifier != null) {
         voteStorage.set(task.voteIdentifier, {
           createdAt: Date.now(),
@@ -190,19 +215,16 @@ async function processVoteQueue(task: VoteTask): Promise<void> {
       tempLogger.flush();
     })
     .catch(async (e) => {
+      // EWX Error - (some) http errors are handled in retryHttpAsyncCall fn
       tempLogger.error(
         {
           task,
         },
-        'failed to submit solution result',
+        'failed to submit solution result - voting wont be retried',
       );
       tempLogger.error(e);
       tempLogger.flush();
 
-      await api.disconnect();
-
-      throw e;
+      // We do not throw for these kind of errors so we can continue processing
     });
-
-  await api.disconnect();
 }

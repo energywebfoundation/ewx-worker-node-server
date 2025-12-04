@@ -8,6 +8,7 @@ import promiseRetry from 'promise-retry';
 import { type WrapOptions } from 'retry';
 import { type Solution, type SolutionGroup } from './polka-types';
 import { type EwxTxManager } from './ewx-tx-manager';
+import { UnableToDecodeSolutionGroup, UnableToObtainStakeError } from '../errors';
 
 export type WorkerAddress = string;
 export type OperatorAddress = string;
@@ -94,7 +95,7 @@ export const getSolutionGroupsByIds = async (
       curr.toPrimitive() as unknown as SolutionGroup;
 
     if (primitive == null) {
-      throw new Error('Unable to decode codec for Solution Group');
+      throw new UnableToDecodeSolutionGroup();
     }
 
     acc[primitive.namespace] = primitive;
@@ -208,7 +209,7 @@ export const queryStake = async (
   );
 
   if (currentStake == null || period == null || nextStake == null) {
-    throw new Error('unable to obtain stake');
+    throw new UnableToObtainStakeError();
   }
 
   return {

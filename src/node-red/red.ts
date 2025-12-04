@@ -12,6 +12,7 @@ import { createLogger } from '../util/logger';
 import { sleep } from '../util/sleep';
 import { type ParsedFlow, type RedNode, type RedNodes } from './types';
 import { type BaseUrlsConfig, getBaseUrls } from '../util/base-urls';
+import { NodeRedNodePropertyNotFound, NodeRedRuntimeStartFailedError } from '../errors';
 
 type EWX_ENVS =
   | 'EWX_SOLUTION'
@@ -147,7 +148,7 @@ export const runtimeStarted = async (maxAttempts: number = 10): Promise<boolean>
         `exceeded max attempts of runtime start`,
       );
 
-      throw new Error('Unable to check if runtime started');
+      throw new NodeRedRuntimeStartFailedError();
     }
 
     // Hacky way of testing if runtime is started - if it returns null, it means runtime has not started
@@ -285,7 +286,7 @@ export const getNodeEnv = (
   const envMeta = node.env.find((x) => x.name === key);
 
   if (envMeta == null && throwOnError) {
-    throw new Error(`${key} not found in ${node.id}`);
+    throw new NodeRedNodePropertyNotFound(node.id, key);
   } else if (envMeta == null && !throwOnError) {
     return undefined;
   }

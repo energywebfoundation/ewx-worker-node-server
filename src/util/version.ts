@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { existsSync, readFileSync } from 'fs';
 import { MAIN_CONFIG } from '../config';
+import { BuildMetadataPathNotFoundError } from '../errors';
 
 const VERSION_SCHEMA = z.object({
   version: z.string(),
@@ -11,7 +12,7 @@ export type Version = z.infer<typeof VERSION_SCHEMA>;
 
 const readVersion = (): Version => {
   if (!existsSync(MAIN_CONFIG.BUILD_METADATA_PATH)) {
-    throw new Error('BUILD_METADATA_PATH does not exist');
+    throw new BuildMetadataPathNotFoundError();
   }
 
   const contents = readFileSync(MAIN_CONFIG.BUILD_METADATA_PATH).toString();

@@ -5,16 +5,17 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import { pushToQueue } from './solution';
 import { runChecks } from './checks';
-import { createConfigRouter } from './worker-config';
 import { retryHttpAsyncCall } from './polkadot/polka';
 import { createLogger } from './util/logger';
 import { createReadPalletApi } from './util/pallet-api';
-import { APP_BOOTSTRAP_STATUS, createStatusRouter, setAppState } from './util/status';
-import { createHealthRouter } from './health/health';
-import { createVoteRouter } from './polkadot/vote';
+import { APP_BOOTSTRAP_STATUS, setAppState } from './util/status';
 import { createKeyringPair } from './polkadot/account';
 import { registerWorker } from './auth/registry';
 import { startHeartbeat } from './health/heartbeat';
+import { createHealthRouter } from './routes/health';
+import { createVoteRouter } from './routes/vote';
+import { createStatusRouter } from './routes/status';
+import { createConfigRouter } from './routes/worker-config';
 
 void (async () => {
   setAppState(APP_BOOTSTRAP_STATUS.STARTED);

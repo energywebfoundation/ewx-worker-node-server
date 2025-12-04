@@ -1,10 +1,10 @@
 import express from 'express';
-import { getSolutionLogicalParts } from './node-red/red';
 import asyncHandler from 'express-async-handler';
-import { AppVersion } from './util/version';
-import { createKeyringPair } from './polkadot/account';
-import { getBaseUrls } from './util/base-urls';
-import { MAIN_CONFIG } from './config';
+import { createKeyringPair } from '../polkadot/account';
+import { getBaseUrls } from '../util/base-urls';
+import { getSolutionLogicalParts } from '../node-red/red';
+import { AppVersion } from '../util/version';
+import { MAIN_CONFIG } from '../config';
 
 export const createConfigRouter = (): express.Router => {
   const router = express.Router({

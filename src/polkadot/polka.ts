@@ -104,8 +104,27 @@ export const getSolutionGroupsByIds = async (
   }, {});
 };
 
-export const getSolutions = async (api: ApiPromise): Promise<SolutionArray> => {
+export const getSolutions = async (
+  api: ApiPromise,
+  operatorSubscriptions: string[],
+): Promise<SolutionArray> => {
   const solutions = await api.query.workerNodePallet.solutions.entries();
+
+  const solutionsWithGroups: Record<string, string> =
+    await api.query.workerNodePallet.groupOfSolution.entries().then((x) => {
+      return x
+        .map(([solutionNamespace, groupOfSolution]) => {
+          return {
+            solutionNamespace: (solutionNamespace.toHuman() as unknown as SolutionId)[0],
+            groupOfSolution: groupOfSolution.toHuman() as unknown as SolutionGroupId,
+          };
+        })
+        .reduce((acc, curr) => {
+          acc[curr.solutionNamespace] = curr.groupOfSolution;
+
+          return acc;
+        }, {});
+    });
 
   const results: SolutionArray = await Promise.all(
     solutions.map(async ([namespaceHash, solution]) => {
@@ -113,12 +132,12 @@ export const getSolutions = async (api: ApiPromise): Promise<SolutionArray> => {
 
       const solutionPrimitive = solution.toPrimitive() as unknown as Solution;
 
-      const groupOfSolution = await api.query.workerNodePallet.groupOfSolution(solutionId);
-
-      const solutionGroupId: string | null =
-        groupOfSolution.toPrimitive() as unknown as SolutionGroupId;
-
-      return [solutionId, solutionGroupId, solutionPrimitive, solutionPrimitive.status];
+      return [
+        solutionId,
+        solutionsWithGroups[solutionId] ?? null,
+        solutionPrimitive,
+        solutionPrimitive.status,
+      ];
     }),
   );
 

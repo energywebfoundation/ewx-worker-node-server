@@ -5,6 +5,11 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/main.js",
+  "engineStrict": true,
+  "engines": {
+    "node": ">=22.21.1",
+    "npm": ">=10.9.0"
+  },
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",

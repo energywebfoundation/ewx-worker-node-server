@@ -1,6 +1,12 @@
 import { type ApiPromise } from '@polkadot/api';
 import { type KeyringPair } from '@polkadot/keyring/types';
-import { deleteNodeById, deleteNodesBySolutionGroupId, getNodeEnv, getTabNodes, upsertSolution } from './node-red/red';
+import {
+  deleteNodeById,
+  deleteNodesBySolutionGroupId,
+  getNodeEnv,
+  getTabNodes,
+  upsertSolution,
+} from './node-red/red';
 import { type Logger } from 'pino';
 import { MAIN_CONFIG } from './config';
 import { type NodeRedSolutionCache, setNodeRedSolutionCache } from './node-red/node-red-cache';
@@ -15,7 +21,7 @@ import {
   type QueryStakeResult,
   retryHttpAsyncCall,
   type SolutionArray,
-  type SolutionGroupId
+  type SolutionGroupId,
 } from './polkadot/polka';
 import { type SolutionGroup } from './polkadot/polka-types';
 import { sleep } from './util/sleep';

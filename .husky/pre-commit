@@ -3,3 +3,6 @@
 
 npm run prettier:lint
 npm run eslint:lint
+npm run generate-envs
+
+git add docs/env-vars.md

@@ -7,4 +7,3 @@ export const createReadPalletApi = async (): Promise<ApiPromise> => {
 
   return await retryHttpAsyncCall(async () => await createApi(rpcUrl));
 };
-

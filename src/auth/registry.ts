@@ -115,7 +115,7 @@ const getWorkerRegistrationStatus = async (
 ): Promise<WorkerRegistrationStatus> => {
   const { workersRegistryUrl } = await getBaseUrls();
 
-  const path =  workersRegistryUrl + `/api/v1/workers/${workerAddress}`;
+  const path = workersRegistryUrl + `/api/v1/workers/${workerAddress}`;
 
   return await axios
     .get(path, {

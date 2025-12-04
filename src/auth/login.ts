@@ -9,24 +9,24 @@ import { createKeyringPair } from '../polkadot/account';
 import { type BaseUrlsConfig, getBaseUrls } from '../util/base-urls';
 
 const authResponseSchema = z.object({
-  accessToken: z.string()
+  accessToken: z.string(),
 });
 
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 
 const logger = createLogger('Auth');
 
-let token: { token: string, expiresAt: number } | null = null;
+let token: { token: string; expiresAt: number } | null = null;
 
 export const getToken = async (): Promise<string | null> => {
   try {
     const account: KeyringPair = createKeyringPair();
 
-    if (token == null || (token.expiresAt - 60 < getCurrentTimestampInSeconds())) {
+    if (token == null || token.expiresAt - 60 < getCurrentTimestampInSeconds()) {
       token = await createToken(account);
     }
 
-    if(token == null) {
+    if (token == null) {
       return null;
     }
 
@@ -42,7 +42,7 @@ export const getToken = async (): Promise<string | null> => {
 const decodeToken = (token: string): { expiresAt: number } | null => {
   const decoded = jwt.decode(token, {
     json: true,
-    complete: true
+    complete: true,
   });
 
   if (decoded == null) {
@@ -52,69 +52,22 @@ const decodeToken = (token: string): { expiresAt: number } | null => {
   }
 
   if (typeof decoded.payload === 'string') {
-    logger.error({
-      payload: decoded.payload
-    }, 'token payload is not an object');
-
-    return null;
-  }
-
-  if (decoded.payload.exp == null) {
-    logger.error({
-      payload: decoded.payload
-    }, 'token expiration is not provided');
-
-    return null;
-  }
-
-  logger.info({
-    issuer: decoded.payload.iss,
-    subject: decoded.payload.sub,
-    audience: decoded.payload.aud,
-    expiration: decoded.payload.exp,
-    issuedAt: decoded.payload.iat
-  }, 'decoded token');
-
-  return {
-    expiresAt: decoded.payload.exp,
-  };
-};
-
-export const createToken = async (account: KeyringPair): Promise<{ token: string; expiresAt: number; } | null> => {
-  const signedPayload = prepareSignInPayload(
-    {
-      accountType: AccountType.WORKER,
-      domainName: MAIN_CONFIG.PALLET_AUTH_SERVER_DOMAIN
-    },
-    account
-  );
-
-  const payload: SignInDto = {
-    payload: signedPayload.constructedPayload,
-    signature: signedPayload.signature
-  };
-
-  const accessToken = await obtainTokenFromAuthServer(payload, account);
-
-  if (accessToken === null) {
-    logger.warn(
+    logger.error(
       {
-        address: account.address
+        payload: decoded.payload,
       },
-      'unable to sign-in'
+      'token payload is not an object',
     );
 
     return null;
   }
 
-  const decodedToken = decodeToken(accessToken);
-
-  if(decodedToken == null) {
-    logger.warn(
+  if (decoded.payload.exp == null) {
+    logger.error(
       {
-        address: account.address
+        payload: decoded.payload,
       },
-      'unable to decode token'
+      'token expiration is not provided',
     );
 
     return null;
@@ -122,14 +75,72 @@ export const createToken = async (account: KeyringPair): Promise<{ token: string
 
   logger.info(
     {
-      address: account.address
+      issuer: decoded.payload.iss,
+      subject: decoded.payload.sub,
+      audience: decoded.payload.aud,
+      expiration: decoded.payload.exp,
+      issuedAt: decoded.payload.iat,
     },
-    `retrieved token`
+    'decoded token',
+  );
+
+  return {
+    expiresAt: decoded.payload.exp,
+  };
+};
+
+export const createToken = async (
+  account: KeyringPair,
+): Promise<{ token: string; expiresAt: number } | null> => {
+  const signedPayload = prepareSignInPayload(
+    {
+      accountType: AccountType.WORKER,
+      domainName: MAIN_CONFIG.PALLET_AUTH_SERVER_DOMAIN,
+    },
+    account,
+  );
+
+  const payload: SignInDto = {
+    payload: signedPayload.constructedPayload,
+    signature: signedPayload.signature,
+  };
+
+  const accessToken = await obtainTokenFromAuthServer(payload, account);
+
+  if (accessToken === null) {
+    logger.warn(
+      {
+        address: account.address,
+      },
+      'unable to sign-in',
+    );
+
+    return null;
+  }
+
+  const decodedToken = decodeToken(accessToken);
+
+  if (decodedToken == null) {
+    logger.warn(
+      {
+        address: account.address,
+      },
+      'unable to decode token',
+    );
+
+    return null;
+  }
+
+  logger.info(
+    {
+      address: account.address,
+    },
+    `retrieved token`,
   );
 
   return {
     token: accessToken,
-    expiresAt: decodedToken?.expiresAt
+    expiresAt: decodedToken?.expiresAt,
   };
 };
 
@@ -137,18 +148,24 @@ const getCurrentTimestampInSeconds = (): number => {
   return Math.floor(Date.now() / 1000);
 };
 
-const obtainTokenFromAuthServer = async (payload: SignInDto, account: KeyringPair): Promise<string | null> => {
+const obtainTokenFromAuthServer = async (
+  payload: SignInDto,
+  account: KeyringPair,
+): Promise<string | null> => {
   const baseUrls: BaseUrlsConfig = await getBaseUrls();
 
   const authUrl: string = `${baseUrls.authServerUrl}/api/auth/login`;
 
-  logger.info({
-    authServerUrl: authUrl,
-  }, 'attempting to sign-in');
+  logger.info(
+    {
+      authServerUrl: authUrl,
+    },
+    'attempting to sign-in',
+  );
 
   const result: AuthResponse | null = await axios
     .post(authUrl, {
-      ...payload
+      ...payload,
     })
     .then((r) => {
       try {
@@ -163,9 +180,9 @@ const obtainTokenFromAuthServer = async (payload: SignInDto, account: KeyringPai
     .catch((e) => {
       logger.error(
         {
-          address: account.address
+          address: account.address,
         },
-        'failed to sign-in'
+        'failed to sign-in',
       );
 
       logger.error(e.message);

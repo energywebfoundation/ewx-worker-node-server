@@ -1,5 +1,5 @@
 import { MAIN_CONFIG } from '../config';
-import pino, { Logger, LoggerOptions } from 'pino';
+import pino, { type Logger, type LoggerOptions } from 'pino';
 
 export const createLogger = (options: string | LoggerOptions): Logger => {
   if (MAIN_CONFIG.PRETTY_PRINT) {

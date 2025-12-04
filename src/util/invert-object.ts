@@ -1,7 +1,7 @@
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 import { InvertObjectEmptyObjectError } from '../errors';
 
-export const invertObject = (obj: Record<string, any>) => {
+export const invertObject = (obj: Record<string, any>): any => {
   if (obj == null) {
     throw new InvertObjectEmptyObjectError();
   }

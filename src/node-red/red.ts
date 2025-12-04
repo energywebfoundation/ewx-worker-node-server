@@ -5,7 +5,11 @@ import * as http from 'http';
 import { type Flows } from '@node-red/runtime';
 import path from 'path';
 import { mkdirSync, rmSync } from 'fs';
-import { getNodeRedSolutionNamespace, NODE_RED_LOG_LEVELS, REVERSED_NODE_RED_LOG_LEVELS } from './node-red-cache';
+import {
+  getNodeRedSolutionNamespace,
+  NODE_RED_LOG_LEVELS,
+  REVERSED_NODE_RED_LOG_LEVELS,
+} from './node-red-cache';
 import { getSmartFlow } from '../solution-source/solution-source';
 import { type SolutionGroupId, type SolutionId, type WorkerAddress } from '../polkadot/polka';
 import { createLogger } from '../util/logger';

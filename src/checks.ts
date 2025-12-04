@@ -1,7 +1,11 @@
 import { type ApiPromise } from '@polkadot/api';
 import { type KeyringPair } from '@polkadot/keyring/types';
 import { MAIN_CONFIG } from './config';
-import { getOperatorSubscriptions, isConnectedAsWorker, retryHttpAsyncCall } from './polkadot/polka';
+import {
+  getOperatorSubscriptions,
+  isConnectedAsWorker,
+  retryHttpAsyncCall,
+} from './polkadot/polka';
 import { sleep } from './util/sleep';
 import { getBaseUrls } from './util/base-urls';
 
@@ -82,4 +86,3 @@ const validateBaseUrls = async (): Promise<boolean> => {
 
   return true;
 };
-

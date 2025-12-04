@@ -1,15 +1,7 @@
 import { type ApiPromise } from '@polkadot/api';
 import { type KeyringPair } from '@polkadot/keyring/types';
-import {
-  deleteNodeById,
-  deleteNodesBySolutionGroupId,
-  getNodeEnv,
-  getTabNodes,
-  upsertSolution,
-} from './node-red/red';
-import { type RedNode, type RedNodes } from './types';
+import { deleteNodeById, deleteNodesBySolutionGroupId, getNodeEnv, getTabNodes, upsertSolution } from './node-red/red';
 import { type Logger } from 'pino';
-import { createLogger, createReadPalletApi, sleep } from './util';
 import { MAIN_CONFIG } from './config';
 import { type NodeRedSolutionCache, setNodeRedSolutionCache } from './node-red/node-red-cache';
 import {
@@ -23,9 +15,13 @@ import {
   type QueryStakeResult,
   retryHttpAsyncCall,
   type SolutionArray,
-  type SolutionGroupId,
+  type SolutionGroupId
 } from './polkadot/polka';
 import { type SolutionGroup } from './polkadot/polka-types';
+import { sleep } from './util/sleep';
+import { createLogger } from './util/logger';
+import { createReadPalletApi } from './util/pallet-api';
+import { type RedNode, type RedNodes } from './node-red/types';
 
 const logger = createLogger('SolutionLoop');
 

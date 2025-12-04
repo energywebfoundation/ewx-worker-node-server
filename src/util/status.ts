@@ -1,5 +1,5 @@
 import express from 'express';
-import { createLogger } from './util';
+import { createLogger } from './logger';
 
 export enum APP_BOOTSTRAP_STATUS {
   STARTED = 'STARTED',

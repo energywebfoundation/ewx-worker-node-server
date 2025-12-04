@@ -6,8 +6,8 @@ import { blake2AsHex, cryptoWaitReady } from '@polkadot/util-crypto';
 import pino from 'pino';
 import promiseRetry from 'promise-retry';
 import { type WrapOptions } from 'retry';
-import type { EwxTxManager } from '../ewx-tx-manager';
 import { type Solution, type SolutionGroup } from './polka-types';
+import { type EwxTxManager } from './ewx-tx-manager';
 
 export type WorkerAddress = string;
 export type OperatorAddress = string;

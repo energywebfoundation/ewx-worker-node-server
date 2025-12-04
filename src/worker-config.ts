@@ -1,8 +1,10 @@
 import express from 'express';
-import { MAIN_CONFIG } from './config';
-import { createKeyringPair } from './account';
 import { getSolutionLogicalParts } from './node-red/red';
 import asyncHandler from 'express-async-handler';
+import { AppVersion } from './util/version';
+import { createKeyringPair } from './polkadot/account';
+import { getBaseUrls } from './util/base-urls';
+import { MAIN_CONFIG } from './config';
 
 export const createConfigRouter = (): express.Router => {
   const router = express.Router({
@@ -13,6 +15,7 @@ export const createConfigRouter = (): express.Router => {
     '/config',
     asyncHandler(async (req, res) => {
       const account = createKeyringPair();
+      const baseUrls = await getBaseUrls();
 
       const solutionDetails: {
         solutionNamespace: string;
@@ -23,9 +26,12 @@ export const createConfigRouter = (): express.Router => {
           : null;
 
       res.status(200).json({
-        rpcUrl: MAIN_CONFIG.PALLET_RPC_URL,
+        rpcUrl: baseUrls.rpcUrl,
         workerAddress: account.address,
+        appVersion: AppVersion,
         solutionDetails,
+        baseUrlsSource: MAIN_CONFIG.BASE_URLS,
+        baseUrls,
       });
     }),
   );

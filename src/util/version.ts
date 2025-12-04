@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { MAIN_CONFIG } from './config';
-import { readFileSync, existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
+import { MAIN_CONFIG } from '../config';
 
 const VERSION_SCHEMA = z.object({
   version: z.string(),

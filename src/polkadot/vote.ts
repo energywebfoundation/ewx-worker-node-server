@@ -5,10 +5,12 @@ import asyncHandler from 'express-async-handler';
 import type { queueAsPromised } from 'fastq';
 import * as fastq from 'fastq';
 import { z } from 'zod';
-import { MAIN_CONFIG } from './config';
-import { getSolutionNamespace } from './node-red/red';
-import { retryHttpAsyncCall, submitSolutionResult } from './polkadot/polka';
-import { createEwxTxManager, createLogger, sleep } from './util';
+import { createLogger } from '../util/logger';
+import { createEwxTxManager } from '../util/ewx-tx-manager';
+import { getSolutionNamespace } from '../node-red/red';
+import { sleep } from '../util/sleep';
+import { MAIN_CONFIG } from '../config';
+import { retryHttpAsyncCall, submitSolutionResult } from './polka';
 
 interface VoteTask {
   votingRoundId: string;

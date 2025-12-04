@@ -1,8 +1,8 @@
-import { createLogger } from './util';
-import { getAllInstalledSolutionsNames, runtimeStarted } from './node-red/red';
 import express from 'express';
 import asyncHandler from 'express-async-handler';
-import { MAIN_CONFIG } from './config';
+import { MAIN_CONFIG } from '../config';
+import { createLogger } from '../util/logger';
+import { getAllInstalledSolutionsNames, runtimeStarted } from '../node-red/red';
 
 enum HealthStatus {
   OK = 'OK',

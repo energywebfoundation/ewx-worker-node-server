@@ -63,7 +63,7 @@ export const ENV_SCHEMA = z.object({
     .boolean()
     .default(true)
     .describe(`If it's enabled it will enable health check routes.`),
-  PALLET_RPC_URL: z.string().url().describe('Read EWX Parachain URL'),
+  PALLET_RPC_URL: z.string().url().describe('Read EWX Parachain URL').optional(),
   VOTING_RPC_URL: z.string().url().describe('Write EWX Parachain URL'),
   VOTING_WORKER_SEED: z.string().describe('Seed of the worker (not operator)'),
   PORT: z.coerce.number().positive().default(8000).describe('Port number of NodeRed Server.'),
@@ -118,13 +118,14 @@ export const ENV_SCHEMA = z.object({
   PALLET_AUTH_SERVER_LOGIN_URL: z
     .string()
     .url()
-    .default('https://auth.energywebx.com/api/auth/login')
-    .describe('Pallet Auth Server Url used for authentication to Workers Registry'),
+    .describe('Pallet Auth Server Url used for authentication to Workers Registry')
+    .optional(),
   PALLET_AUTH_SERVER_DOMAIN: z.string().default('default').describe('Pallet Auth Server domain'),
   WORKER_REGISTRY_URL: z
     .string()
-    .url('Url of Workers Registry that stores information about Worker Location')
-    .default('https://workers-registry.energywebx.com'),
+    .url()
+    .describe('Url of Workers Registry that stores information about Worker Location')
+    .optional(),
   BASE_URLS: z
     .string()
     .url()

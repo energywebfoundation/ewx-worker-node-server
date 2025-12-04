@@ -3,17 +3,18 @@ import { cryptoWaitReady } from '@polkadot/util-crypto';
 import { deleteAll, startRedServer } from './node-red/red';
 import express from 'express';
 import bodyParser from 'body-parser';
-import { createVoteRouter } from './vote';
 import { pushToQueue } from './solution';
-import { createHealthRouter } from './health';
 import { runChecks } from './checks';
-import { createKeyringPair } from './account';
-import { APP_BOOTSTRAP_STATUS, createStatusRouter, setAppState } from './status';
-import { createLogger, createReadPalletApi } from './util';
 import { createConfigRouter } from './worker-config';
 import { retryHttpAsyncCall } from './polkadot/polka';
-import { startHeartbeat } from './heartbeat';
-import { registerWorker } from './registry';
+import { createLogger } from './util/logger';
+import { createReadPalletApi } from './util/pallet-api';
+import { APP_BOOTSTRAP_STATUS, createStatusRouter, setAppState } from './util/status';
+import { createHealthRouter } from './health/health';
+import { createVoteRouter } from './polkadot/vote';
+import { createKeyringPair } from './polkadot/account';
+import { registerWorker } from './auth/registry';
+import { startHeartbeat } from './health/heartbeat';
 
 void (async () => {
   setAppState(APP_BOOTSTRAP_STATUS.STARTED);

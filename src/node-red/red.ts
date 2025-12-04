@@ -3,17 +3,15 @@ import { MAIN_CONFIG } from '../config';
 import * as RED from 'node-red';
 import * as http from 'http';
 import { type Flows } from '@node-red/runtime';
-import { type ParsedFlow, type RedNode, type RedNodes } from '../types';
-import { createLogger, sleep } from '../util';
 import path from 'path';
 import { mkdirSync, rmSync } from 'fs';
-import {
-  getNodeRedSolutionNamespace,
-  NODE_RED_LOG_LEVELS,
-  REVERSED_NODE_RED_LOG_LEVELS,
-} from './node-red-cache';
+import { getNodeRedSolutionNamespace, NODE_RED_LOG_LEVELS, REVERSED_NODE_RED_LOG_LEVELS } from './node-red-cache';
 import { getSmartFlow } from '../solution-source/solution-source';
 import { type SolutionGroupId, type SolutionId, type WorkerAddress } from '../polkadot/polka';
+import { createLogger } from '../util/logger';
+import { sleep } from '../util/sleep';
+import { type ParsedFlow, type RedNode, type RedNodes } from './types';
+import { type BaseUrlsConfig, getBaseUrls } from '../util/base-urls';
 
 type EWX_ENVS =
   | 'EWX_SOLUTION'
@@ -236,6 +234,8 @@ export const upsertSolution = async (
     configs?: any[];
   } = JSON.parse(content);
 
+  const baseUrls: BaseUrlsConfig = await getBaseUrls();
+
   const parsedFlow: ParsedFlow = modifyFlowIds(
     parsedContent,
     solutionGroupId,
@@ -244,6 +244,7 @@ export const upsertSolution = async (
     worklogicId,
     sqliteFilePath,
     workerAddress,
+    baseUrls.rpcUrl,
   );
 
   if (parsedFlow === null) {
@@ -445,6 +446,7 @@ export const modifyFlowIds = (
   workLogic: string,
   sqlitePath: string,
   workerAddress: string,
+  rpcUrl: string,
 ): ParsedFlow | null => {
   if (parsedFlow?.nodes == null) {
     return null;
@@ -498,7 +500,7 @@ export const modifyFlowIds = (
     {
       type: 'str',
       name: 'EWX_RPC_URL',
-      value: MAIN_CONFIG.PALLET_RPC_URL,
+      value: rpcUrl,
     },
   ];
 

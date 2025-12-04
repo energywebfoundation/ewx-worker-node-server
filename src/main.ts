@@ -16,6 +16,7 @@ import { createHealthRouter } from './routes/health';
 import { createVoteRouter } from './routes/vote';
 import { createStatusRouter } from './routes/status';
 import { createConfigRouter } from './routes/worker-config';
+import { createTokenRouter } from './routes/token';
 
 void (async () => {
   setAppState(APP_BOOTSTRAP_STATUS.STARTED);
@@ -30,6 +31,7 @@ void (async () => {
   const healthRouter: express.Router | null = createHealthRouter();
 
   app.use(createVoteRouter());
+  app.use(createTokenRouter());
   app.use(createStatusRouter());
   app.use(createConfigRouter());
 

@@ -154,7 +154,9 @@ const obtainTokenFromAuthServer = async (
 ): Promise<string | null> => {
   const baseUrls: BaseUrlsConfig = await getBaseUrls();
 
-  const authUrl: string = `${baseUrls.authServerUrl}/api/auth/login`;
+  const authUrl: string = baseUrls.authServerUrl.includes('api/auth/login')
+    ? baseUrls.authServerUrl
+    : `${baseUrls.authServerUrl}/api/auth/login`;
 
   logger.info(
     {

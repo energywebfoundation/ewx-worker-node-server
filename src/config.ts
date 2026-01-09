@@ -131,6 +131,20 @@ export const ENV_SCHEMA = z.object({
     .default('https://marketplace-cdn.energyweb.org/base_urls.json')
     .describe('Base URLs of EWX resources'),
   BUILD_METADATA_PATH: z.string().default('./build.json').describe('Path to build metadata file'),
+  LOG_FILE_PATH: z
+    .string()
+    .optional()
+    .describe(
+      'Full path to log file (e.g., /var/log/app.log or ./logs/app.log). Must include filename, not just directory. If directory does not exist, it will be created automatically. If not set, logs will only go to console.',
+    ),
+  LOG_RETENTION_DAYS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Maximum number of days to keep rotated log files. For daily rotation, this is the number of old log files to retain (e.g., 7 = keep 7 days of logs). If not set, logs are kept indefinitely.',
+    ),
 });
 
 export const MAIN_CONFIG: z.infer<typeof ENV_SCHEMA> = (process.env.__SKIP_PARSE_CONFIG === 'true'

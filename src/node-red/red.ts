@@ -14,6 +14,7 @@ import {
 } from './node-red-cache';
 import { getSmartFlow } from '../solution-source/solution-source';
 import { type SolutionGroupId, type SolutionId, type WorkerAddress } from '../polkadot/polka';
+import { setNodeRedServer } from '../shutdown';
 
 type EWX_ENVS =
   | 'EWX_SOLUTION'
@@ -133,6 +134,9 @@ export const startRedServer = async (app: express.Express): Promise<void> => {
 
     redLogger.info(`To access UI panel visit http://localhost:${port}/red`);
   });
+
+  // Store server reference for graceful shutdown
+  setNodeRedServer(server);
 };
 
 export const runtimeStarted = async (maxAttempts: number = 10): Promise<boolean> => {

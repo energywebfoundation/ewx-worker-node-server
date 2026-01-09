@@ -3,6 +3,7 @@ import { cryptoWaitReady } from '@polkadot/util-crypto';
 import { deleteAll, startRedServer } from './node-red/red';
 import express from 'express';
 import bodyParser from 'body-parser';
+import type * as http from 'http';
 import { createVoteRouter } from './vote';
 import { pushToQueue } from './solution';
 import { createHealthRouter } from './health';
@@ -14,6 +15,7 @@ import { createConfigRouter } from './worker-config';
 import { retryHttpAsyncCall } from './polkadot/polka';
 import { startHeartbeat } from './heartbeat';
 import { registerWorker } from './registry';
+import { setMainServer } from './shutdown';
 
 void (async () => {
   setAppState(APP_BOOTSTRAP_STATUS.STARTED);
@@ -37,9 +39,12 @@ void (async () => {
     app.use(healthRouter);
   }
 
-  app.listen(3002, () => {
+  const mainServer: http.Server = app.listen(3002, () => {
     logger.info(`vote API exposed on port 3002`);
   });
+
+  // Store server reference for graceful shutdown
+  setMainServer(mainServer);
 
   setAppState(APP_BOOTSTRAP_STATUS.EXPOSED_HTTP);
 

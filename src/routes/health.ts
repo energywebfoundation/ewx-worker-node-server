@@ -1,7 +1,7 @@
 import { MAIN_CONFIG } from '../config';
 import express from 'express';
 import { createLogger } from '../util/logger';
-import { isLive, isReady } from '../health/health';
+import { isLive, isReady, getSolutionGroupsDetailsStatus } from '../health/health';
 import asyncHandler from 'express-async-handler';
 
 export const createHealthRouter = (): express.Router | null => {
@@ -27,6 +27,17 @@ export const createHealthRouter = (): express.Router | null => {
       const result = await isReady();
 
       healthLogger.debug(result, 'requested readiness');
+
+      res.json(result);
+    }),
+  );
+
+  healthRouter.get(
+    '/health/status',
+    asyncHandler(async (req, res) => {
+      const result = await getSolutionGroupsDetailsStatus();
+
+      healthLogger.debug(result, 'requested solution groups details status');
 
       res.json(result);
     }),

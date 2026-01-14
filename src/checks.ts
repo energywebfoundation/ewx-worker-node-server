@@ -8,6 +8,7 @@ import {
 } from './polkadot/polka';
 import { sleep } from './util/sleep';
 import { getBaseUrls } from './util/base-urls';
+import { saveOperatorAddress } from './util/operator-address-cache';
 
 export const runChecks = async (api: ApiPromise, account: KeyringPair, logger): Promise<void> => {
   const shouldRetryInfinite: boolean = MAIN_CONFIG.RETRY_WORKER_CHECKS;
@@ -53,6 +54,9 @@ export const performInitialChecks = async (
   }
 
   logger.info({ operatorAddress }, 'operator address');
+
+  // Save operator address to local cache
+  saveOperatorAddress(account.address, operatorAddress);
 
   const operatorSubscriptions: string[] = await retryHttpAsyncCall(
     async () => await getOperatorSubscriptions(api, operatorAddress),

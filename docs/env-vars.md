@@ -37,5 +37,6 @@ _Object containing the following properties:_
 | `WORKER_REGISTRY_URL`          | Url of Workers Registry that stores information about Worker Location. If provided, it will overwrite value provided from BASE_URLS.                                                                  | `string` (_url_)       |                                                          |
 | `BASE_URLS`                    | Base URLs of EWX resources                                                                                                                                                                            | `string` (_url_)       | `'https://marketplace-cdn.energyweb.org/base_urls.json'` |
 | `BUILD_METADATA_PATH`          | Path to build metadata file                                                                                                                                                                           | `string`               | `'./build.json'`                                         |
+| `SHUTDOWN_TIMEOUT_MS`          | Timeout in milliseconds for graceful shutdown (default: 30000)                                                                                                                                        | `number` (_>0_)        | `30000`                                                  |
 
 _(\*) Required._

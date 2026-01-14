@@ -130,3 +130,18 @@ async function processVoteQueue(task: VoteTask): Promise<void> {
       // We do not throw for these kind of errors so we can continue processing
     });
 }
+
+// Drains the vote queue, waiting for all pending and running tasks to complete.
+export const drainVoteQueue = async (): Promise<void> => {
+  voteQueueLogger.info(
+    {
+      pendingTasks: voteQueue.length(),
+      runningTasks: voteQueue.running(),
+    },
+    'draining vote queue',
+  );
+
+  await voteQueue.drained();
+
+  voteQueueLogger.info('vote queue drained successfully');
+};

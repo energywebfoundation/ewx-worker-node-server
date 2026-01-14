@@ -30,7 +30,7 @@ type EWX_ENVS =
 
 const redLogger = createLogger('NodeRed');
 
-export const startRedServer = async (app: express.Express): Promise<void> => {
+export const startRedServer = async (app: express.Express): Promise<http.Server> => {
   const loggerConfig = {
     console: {
       level: 'off',
@@ -136,6 +136,8 @@ export const startRedServer = async (app: express.Express): Promise<void> => {
 
     redLogger.info(`To access UI panel visit http://localhost:${port}/red`);
   });
+
+  return server;
 };
 
 export const runtimeStarted = async (maxAttempts: number = 10): Promise<boolean> => {

@@ -153,6 +153,11 @@ export const ENV_SCHEMA = z.object({
     .default('https://marketplace-cdn.energyweb.org/base_urls.json')
     .describe('Base URLs of EWX resources'),
   BUILD_METADATA_PATH: z.string().default('./build.json').describe('Path to build metadata file'),
+  SHUTDOWN_TIMEOUT_MS: z.coerce
+    .number()
+    .positive()
+    .default(30000)
+    .describe('Timeout in milliseconds for graceful shutdown (default: 30000)'),
 });
 
 export const MAIN_CONFIG: z.infer<typeof ENV_SCHEMA> = (process.env.__SKIP_PARSE_CONFIG === 'true'

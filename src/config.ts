@@ -107,6 +107,17 @@ export const ENV_SCHEMA = z.object({
     .describe(
       `Should pretty print logs. If you plan to use Grafana or any other log tooling it's recommended to set it to false.`,
     ),
+  LOG_FILE_PATH: z
+    .string()
+    .optional()
+    .describe(
+      'Full path to log file (e.g., /var/log/app.log or ./logs/app.log). If not provided, file logging is disabled.',
+    ),
+  LOG_RETENTION_DAYS: z.coerce
+    .number()
+    .positive()
+    .optional()
+    .describe('Number of days to keep rotated logs'),
   HEARTBEAT_PATH: z
     .string()
     .default('heartbeat_monitor.txt')

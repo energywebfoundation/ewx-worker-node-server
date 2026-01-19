@@ -158,6 +158,18 @@ export const ENV_SCHEMA = z.object({
     .positive()
     .default(30000)
     .describe('Timeout in milliseconds for graceful shutdown (default: 30000)'),
+  ADMIN_SERVER_PORT: z.coerce
+    .number()
+    .positive()
+    .default(3003)
+    .describe('Port number for admin server (default: 3003)'),
+  ADMIN_API_KEY: z
+    .string()
+    .min(32)
+    .optional()
+    .describe(
+      'API key for admin endpoints authentication. Must be at least 32 characters. If not set, admin endpoints will be accessible without authentication.',
+    ),
 });
 
 export const MAIN_CONFIG: z.infer<typeof ENV_SCHEMA> = (process.env.__SKIP_PARSE_CONFIG === 'true'

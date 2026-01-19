@@ -9,6 +9,7 @@ const logger = createLogger('Shutdown');
 // Store references to resources that need cleanup
 let mainServer: http.Server | null = null;
 let nodeRedServer: http.Server | null = null;
+let adminServer: http.Server | null = null;
 
 let isShuttingDown = false;
 
@@ -23,6 +24,10 @@ export const setMainServer = (server: http.Server): void => {
 
 export const setNodeRedServer = (server: http.Server): void => {
   nodeRedServer = server;
+};
+
+export const setAdminServer = (server: http.Server): void => {
+  adminServer = server;
 };
 
 // Main shutdown function
@@ -88,6 +93,21 @@ export const gracefulShutdown = async (
         });
       } catch (error) {
         logger.error({ error }, 'error closing main server');
+      }
+    }
+
+    // Close admin server
+    if (adminServer != null) {
+      try {
+        await new Promise<void>((resolve) => {
+          adminServer?.close(() => {
+            logger.info('admin HTTP server closed');
+            resolve();
+          });
+          adminServer?.closeIdleConnections();
+        });
+      } catch (error) {
+        logger.error({ error }, 'error closing admin server');
       }
     }
 

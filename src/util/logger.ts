@@ -15,7 +15,7 @@ const normalizeLogPath = (logPath: string): string => {
   return logPath;
 };
 
-const ensureLogDir = (logPath: string): void => {
+const ensureLogDirExists = (logPath: string): void => {
   const dir = path.dirname(logPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -27,7 +27,7 @@ const getFileTransport = (
   retentionDays?: number,
 ): ReturnType<typeof pino.transport> => {
   const normalizedPath = normalizeLogPath(logPath);
-  ensureLogDir(normalizedPath);
+  ensureLogDirExists(normalizedPath);
 
   const parsed = path.parse(normalizedPath);
   const options = {
@@ -43,11 +43,11 @@ const getFileTransport = (
     },
     ...(retentionDays != null && retentionDays > 0
       ? {
-        limit: {
-          count: retentionDays,
-          removeOtherLogFiles: true,
-        },
-      }
+          limit: {
+            count: retentionDays,
+            removeOtherLogFiles: true,
+          },
+        }
       : {}),
   };
 
@@ -87,8 +87,7 @@ const getPrettyTransport = (): ReturnType<typeof pino.transport> => {
 };
 
 export const createLogger = (options: string | LoggerOptions): Logger => {
-  const loggerOptions =
-    typeof options === 'string' ? { name: options } : options;
+  const loggerOptions = typeof options === 'string' ? { name: options } : options;
   const level = loggerOptions.level ?? 'info';
 
   const { LOG_FILE_PATH, PRETTY_PRINT, LOG_RETENTION_DAYS } = MAIN_CONFIG;

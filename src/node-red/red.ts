@@ -383,17 +383,15 @@ export const deleteNodesBySolutionGroupId = async (solutionGroupIds: string[]): 
 export const getAllInstalledSolutionsNames = async (): Promise<string[]> => {
   const tabNodes = await getTabNodes();
 
-  const solutionIds: Array<string | null> = await Promise.all(
-    tabNodes.map(async (tabNode: RedNode) => {
-      const solutionId = getNodeEnv(tabNode, 'EWX_SOLUTION_ID', false);
+  const solutionIds: Array<string | null> = tabNodes.map((tabNode: RedNode) => {
+    const solutionId = getNodeEnv(tabNode, 'EWX_SOLUTION_ID', false);
 
-      if (solutionId == null) {
-        return null;
-      }
+    if (solutionId == null) {
+      return null;
+    }
 
-      return solutionId;
-    }),
-  );
+    return solutionId;
+  });
 
   return solutionIds.filter((x) => x !== null);
 };
@@ -406,21 +404,19 @@ export interface InstalledSolutionDetails {
 export const getAllInstalledSolutionsWithGroups = async (): Promise<InstalledSolutionDetails[]> => {
   const tabNodes = await getTabNodes();
 
-  const solutions: Array<InstalledSolutionDetails | null> = await Promise.all(
-    tabNodes.map(async (tabNode: RedNode) => {
-      const solutionId = getNodeEnv(tabNode, 'EWX_SOLUTION_ID', false);
-      const solutionGroupId = getNodeEnv(tabNode, 'EWX_SOLUTION_GROUP_ID', false);
+  const solutions: Array<InstalledSolutionDetails | null> = tabNodes.map((tabNode: RedNode) => {
+    const solutionId = getNodeEnv(tabNode, 'EWX_SOLUTION_ID', false);
+    const solutionGroupId = getNodeEnv(tabNode, 'EWX_SOLUTION_GROUP_ID', false);
 
-      if (solutionId == null || solutionGroupId == null) {
-        return null;
-      }
+    if (solutionId == null || solutionGroupId == null) {
+      return null;
+    }
 
-      return {
-        solutionId,
-        solutionGroupId,
-      };
-    }),
-  );
+    return {
+      solutionId,
+      solutionGroupId,
+    };
+  });
 
   return solutions.filter((x): x is InstalledSolutionDetails => x !== null);
 };

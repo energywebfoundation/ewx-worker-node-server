@@ -8,13 +8,27 @@ const logger = createLogger('OperatorInfo');
 // UUID regex (RFC4122: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Extracts solution name, removing UUID suffix if present
+/**
+ * Extracts a display name from solutionId for health/operator info.
+ *
+ * Use case: EWX solution IDs often follow "name.uuid" (e.g. "newTestGPSaaS.1348d595-ccc4-4a38-85ad-f0e31cc7f410").
+ * When the segment after the last dot is a valid UUID, we use the prefix as the human-readable name;
+ * otherwise we return the full solutionId (e.g. "a.b.c" or "simpleName").
+ *
+ * Edge cases: if stripping would yield an empty name (e.g. ".uuid" or malformed ids), returns the
+ * full solutionId so the UI never shows an empty name.
+ */
 const extractSolutionName = (solutionId: string): string => {
+  if (solutionId.length === 0) return solutionId;
+
   const lastDot = solutionId.lastIndexOf('.');
   if (lastDot === -1) return solutionId;
 
   const lastSegment = solutionId.substring(lastDot + 1);
-  return UUID_REGEX.test(lastSegment) ? solutionId.substring(0, lastDot) : solutionId;
+  if (!UUID_REGEX.test(lastSegment)) return solutionId;
+
+  const name = solutionId.substring(0, lastDot);
+  return name.length > 0 ? name : solutionId;
 };
 
 export enum SolutionStatus {

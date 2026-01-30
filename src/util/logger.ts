@@ -2,6 +2,7 @@ import { MAIN_CONFIG } from '../config';
 import pino, { type Logger, type LoggerOptions } from 'pino';
 import * as path from 'path';
 import * as fs from 'fs';
+import hash from 'object-hash';
 
 const transportCache = new Map<string, ReturnType<typeof pino.transport>>();
 
@@ -51,7 +52,7 @@ const getFileTransport = (
       : {}),
   };
 
-  const cacheKey = `file:${JSON.stringify(options)}`;
+  const cacheKey = `file:${hash(options)}`;
   const cached = transportCache.get(cacheKey);
   if (cached != null) {
     return cached;
@@ -72,7 +73,7 @@ const getPrettyTransport = (): ReturnType<typeof pino.transport> => {
     translateTime: 'SYS:HH:MM:ss',
   };
 
-  const cacheKey = `pretty:${JSON.stringify(options)}`;
+  const cacheKey = `pretty:${hash(options)}`;
   const cached = transportCache.get(cacheKey);
   if (cached != null) {
     return cached;

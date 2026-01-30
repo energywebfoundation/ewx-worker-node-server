@@ -72,19 +72,17 @@ export const getNodeRedHealth = async (): Promise<NodeRedHealthStatus> => {
 
 export const getSolutionGroupsDetailsStatus = async (): Promise<SolutionGroupsDetailsStatus> => {
   const timestamp = new Date().toISOString();
+  const rpcUrl = MAIN_CONFIG.PALLET_RPC_URL;
 
-  // Gather configuration (non-sensitive)
-  let rpcUrl: string | undefined;
-  let workerAddress: string | undefined;
+  let account: ReturnType<typeof createKeyringPair>;
   try {
-    const account = createKeyringPair();
-    workerAddress = account.address;
-    rpcUrl = MAIN_CONFIG.PALLET_RPC_URL;
+    account = createKeyringPair();
   } catch {
-    rpcUrl = MAIN_CONFIG.PALLET_RPC_URL;
+    // No worker identity (e.g. config not ready); return config only
+    return { timestamp, rpcUrl };
   }
 
-  // Get operator information with solution groups
+  const workerAddress = account.address;
   const operatorInfo = await getOperatorInfo();
 
   return {

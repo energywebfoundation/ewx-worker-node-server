@@ -55,8 +55,8 @@ export const performInitialChecks = async (
 
   logger.info({ operatorAddress }, 'operator address');
 
-  // Save operator address to local cache
-  saveOperatorAddress(account.address, operatorAddress);
+  // Save operator address to local cache (with TTL so operator changes are reflected)
+  await saveOperatorAddress(account.address, operatorAddress);
 
   const operatorSubscriptions: string[] = await retryHttpAsyncCall(
     async () => await getOperatorSubscriptions(api, operatorAddress),

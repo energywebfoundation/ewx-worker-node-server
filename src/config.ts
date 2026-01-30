@@ -107,6 +107,17 @@ export const ENV_SCHEMA = z.object({
     .describe(
       `Should pretty print logs. If you plan to use Grafana or any other log tooling it's recommended to set it to false.`,
     ),
+  LOG_FILE_PATH: z
+    .string()
+    .optional()
+    .describe(
+      'Full path to log file (e.g., /var/log/app.log or ./logs/app.log). If not provided, file logging is disabled.',
+    ),
+  LOG_RETENTION_DAYS: z.coerce
+    .number()
+    .positive()
+    .optional()
+    .describe('Number of days to keep rotated logs'),
   HEARTBEAT_PATH: z
     .string()
     .default('heartbeat_monitor.txt')
@@ -142,6 +153,23 @@ export const ENV_SCHEMA = z.object({
     .default('https://marketplace-cdn.energyweb.org/base_urls.json')
     .describe('Base URLs of EWX resources'),
   BUILD_METADATA_PATH: z.string().default('./build.json').describe('Path to build metadata file'),
+  SHUTDOWN_TIMEOUT_MS: z.coerce
+    .number()
+    .positive()
+    .default(30000)
+    .describe('Timeout in milliseconds for graceful shutdown (default: 30000)'),
+  ADMIN_SERVER_PORT: z.coerce
+    .number()
+    .positive()
+    .default(3003)
+    .describe('Port number for admin server (default: 3003)'),
+  ADMIN_API_KEY: z
+    .string()
+    .min(32)
+    .optional()
+    .describe(
+      'API key for admin endpoints authentication. Must be at least 32 characters. If not set, admin endpoints will be accessible without authentication.',
+    ),
 });
 
 export const MAIN_CONFIG: z.infer<typeof ENV_SCHEMA> = (process.env.__SKIP_PARSE_CONFIG === 'true'

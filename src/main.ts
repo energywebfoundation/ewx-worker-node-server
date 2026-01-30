@@ -17,6 +17,9 @@ import { createVoteRouter } from './routes/vote';
 import { createStatusRouter } from './routes/status';
 import { createConfigRouter } from './routes/worker-config';
 import { createTokenRouter } from './routes/token';
+import { createAdminRouter } from './routes/admin';
+import { setMainServer, setNodeRedServer, setAdminServer } from './shutdown';
+import { MAIN_CONFIG } from './config';
 
 void (async () => {
   setAppState(APP_BOOTSTRAP_STATUS.STARTED);
@@ -41,9 +44,21 @@ void (async () => {
     app.use(healthRouter);
   }
 
-  app.listen(3002, () => {
+  const mainServer = app.listen(3002, () => {
     logger.info(`vote API exposed on port 3002`);
   });
+  setMainServer(mainServer);
+
+  // Start admin server separately
+  const adminApp = express();
+  adminApp.use(bodyParser.json());
+  adminApp.use(bodyParser.urlencoded({ extended: false }));
+  adminApp.use(createAdminRouter());
+
+  const adminServer = adminApp.listen(MAIN_CONFIG.ADMIN_SERVER_PORT, () => {
+    logger.info(`admin API exposed on port ${MAIN_CONFIG.ADMIN_SERVER_PORT}`);
+  });
+  setAdminServer(adminServer);
 
   setAppState(APP_BOOTSTRAP_STATUS.EXPOSED_HTTP);
 
@@ -70,7 +85,8 @@ void (async () => {
 
   await registerWorker(account);
 
-  await startRedServer(app);
+  const nodeRedServer = await startRedServer(app);
+  setNodeRedServer(nodeRedServer);
 
   setAppState(APP_BOOTSTRAP_STATUS.STARTED_RED_SERVER);
 

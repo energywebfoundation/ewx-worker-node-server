@@ -38,19 +38,25 @@ export const pushToQueue = async (account: KeyringPair): Promise<void> => {
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const api: ApiPromise = await retryHttpAsyncCall(async () => await createReadPalletApi());
+    try {
+      const api: ApiPromise = await retryHttpAsyncCall(async () => await createReadPalletApi());
 
-    await processSolutionQueue(api, account).catch(async (e) => {
-      logger.error('failed to complete queue loop');
-      logger.error(e);
+      await processSolutionQueue(api, account).catch(async (e) => {
+        logger.error('failed to complete queue loop');
+        logger.error(e);
 
-      await sleep(50000);
-      await pushToQueue(account);
+        await sleep(50000);
+        await pushToQueue(account);
+        await api.disconnect();
+      });
+
       await api.disconnect();
-    });
-
-    await api.disconnect();
-    await sleep(timeout);
+      await sleep(timeout);
+    } catch (e) {
+      logger.error('Critical error in pushToQueue loop, retrying in 50s');
+      logger.error(e);
+      await sleep(50000);
+    }
   }
 };
 

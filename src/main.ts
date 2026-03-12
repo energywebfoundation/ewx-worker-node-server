@@ -21,10 +21,22 @@ import { createAdminRouter } from './routes/admin';
 import { setMainServer, setNodeRedServer, setAdminServer } from './shutdown';
 import { MAIN_CONFIG } from './config';
 
-void (async () => {
-  setAppState(APP_BOOTSTRAP_STATUS.STARTED);
+const logger = createLogger('WorkerNode');
 
-  const logger = createLogger('WorkerNode');
+const registerProcessHandlers = (): void => {
+  process.on('unhandledRejection', (reason) => {
+    logger.error({ reason }, 'unhandled promise rejection');
+  });
+
+  process.on('uncaughtException', (error) => {
+    logger.error({ err: error }, 'uncaught exception');
+  });
+};
+
+const bootstrap = async (): Promise<void> => {
+  registerProcessHandlers();
+
+  setAppState(APP_BOOTSTRAP_STATUS.STARTED);
 
   const app = express();
 
@@ -100,4 +112,8 @@ void (async () => {
 
   logger.info('starting heartbeat');
   startHeartbeat();
-})();
+};
+
+void bootstrap().catch((error) => {
+  logger.error({ err: error }, 'bootstrap failed');
+});

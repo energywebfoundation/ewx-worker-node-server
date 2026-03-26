@@ -28,6 +28,11 @@ import { sleep } from './util/sleep';
 import { createLogger } from './util/logger';
 import { createReadPalletApi } from './util/pallet-api';
 import { type RedNode, type RedNodes } from './node-red/types';
+import {
+  solutionGroupCache,
+  solutionNameCache,
+  SOLUTION_GROUP_NAME_CACHE_TTL_MS,
+} from './util/operator-info';
 
 const logger = createLogger('SolutionLoop');
 
@@ -100,6 +105,12 @@ async function processSolutionQueue(api: ApiPromise, workerAccount: KeyringPair)
     operatorSubscriptions,
   );
 
+  for (const [id, group] of Object.entries(solutionGroups)) {
+    if (group?.info?.name != null && group.info.name !== '') {
+      await solutionGroupCache.set(id, group.info.name, SOLUTION_GROUP_NAME_CACHE_TTL_MS);
+    }
+  }
+
   logger.info({ operatorSubscriptions, operatorAddress }, `found operator subscriptions`);
 
   const tabNodes: RedNodes = await getTabNodes();
@@ -110,6 +121,16 @@ async function processSolutionQueue(api: ApiPromise, workerAccount: KeyringPair)
   );
 
   const unfilteredSolutions: SolutionArray = await getSolutions(api, operatorSubscriptions);
+
+  for (const [solutionId, , solutionObj] of unfilteredSolutions) {
+    if (solutionObj?.info?.name != null && solutionObj.info.name !== '') {
+      await solutionNameCache.set(
+        solutionId,
+        solutionObj.info.name,
+        SOLUTION_GROUP_NAME_CACHE_TTL_MS,
+      );
+    }
+  }
 
   const solutions: SolutionArray = unfilteredSolutions.filter((solution) =>
     operatorSubscriptions.includes(solution[1]),

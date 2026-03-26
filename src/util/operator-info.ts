@@ -1,9 +1,18 @@
+import { createCache } from 'cache-manager';
 import { getAllInstalledSolutionsWithGroups, type InstalledSolutionDetails } from '../node-red/red';
 import { createKeyringPair } from '../polkadot/account';
 import { getCachedOperatorAddress } from './operator-address-cache';
 import { createLogger } from './logger';
 
 const logger = createLogger('OperatorInfo');
+
+export const SOLUTION_GROUP_NAME_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+export const solutionGroupCache = createCache({
+  ttl: SOLUTION_GROUP_NAME_CACHE_TTL_MS,
+});
+export const solutionNameCache = createCache({
+  ttl: SOLUTION_GROUP_NAME_CACHE_TTL_MS,
+});
 
 // UUID regex (RFC4122: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -95,6 +104,26 @@ export const getOperatorInfo = async (timeoutMs: number = 5000): Promise<Operato
       return null;
     }
 
+    // Note: Population of this cache is handled entirely in the background by solution.ts list queue.
+    const groupNames: Record<string, string> = {};
+
+    for (const id of uniqueSolutionGroupIds) {
+      const cachedName = await solutionGroupCache.get(id);
+      if (cachedName != null && typeof cachedName === 'string') {
+        groupNames[id] = cachedName;
+      }
+    }
+
+    const solutionNames: Record<string, string> = {};
+    for (const solution of installedSolutionsWithGroups) {
+      if (solutionNames[solution.solutionId] == null) {
+        const cachedName = await solutionNameCache.get(solution.solutionId);
+        if (cachedName != null && typeof cachedName === 'string') {
+          solutionNames[solution.solutionId] = cachedName;
+        }
+      }
+    }
+
     // Group installed solutions by solutionGroupId (local data)
     const solutionGroupsMap = new Map<string, InstalledSolutionDetails[]>();
     for (const solution of installedSolutionsWithGroups) {
@@ -108,7 +137,8 @@ export const getOperatorInfo = async (timeoutMs: number = 5000): Promise<Operato
       ([solutionGroupId, solutions]) => {
         const solutionInfos: SolutionInfo[] = solutions.map((solution) => {
           // Extract name from solutionId, handling UUID suffix if present
-          const name = extractSolutionName(solution.solutionId);
+          const name =
+            solutionNames[solution.solutionId] ?? extractSolutionName(solution.solutionId);
 
           return {
             id: solution.solutionId,
@@ -120,7 +150,7 @@ export const getOperatorInfo = async (timeoutMs: number = 5000): Promise<Operato
 
         return {
           id: solutionGroupId,
-          name: solutionGroupId, // Use groupId as name (we don't have name from chain)
+          name: groupNames[solutionGroupId] ?? solutionGroupId,
           solutions: solutionInfos,
         };
       },

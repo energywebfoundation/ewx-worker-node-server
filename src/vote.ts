@@ -6,7 +6,7 @@ import type { queueAsPromised } from 'fastq';
 import * as fastq from 'fastq';
 import { z } from 'zod';
 import { MAIN_CONFIG } from './config';
-import { getSolutionNamespace } from './node-red/red';
+import { ALL_RUNTIMES } from './runtime/registry';
 import { retryHttpAsyncCall, submitSolutionResult } from './polkadot/polka';
 import { createEwxTxManager, createLogger, sleep } from './util';
 
@@ -20,12 +20,26 @@ interface VoteTask {
   hashVote: boolean;
 }
 
+/**
+ * Accept either:
+ *   - noderedId + root + id      (legacy NR flows)
+ *   - solutionId + root + id     (new n8n flows, or NR flows that prefer this)
+ *
+ * solutionId takes precedence if both are sent, because it's the canonical
+ * chain-level identifier. noderedId is resolved via the runtime registry so
+ * the lookup works regardless of which runtime submitted the vote.
+ */
 const SUBMIT_VOTE_SCHEMA = z
   .object({
     id: z.string(),
-    noderedId: z.string(),
+    noderedId: z.string().optional(),
+    solutionId: z.string().optional(),
     root: z.string(),
     hashVote: z.boolean().optional().default(true),
+  })
+  .refine((data) => data.noderedId != null || data.solutionId != null, {
+    message: 'vote must include either noderedId or solutionId',
+    path: ['solutionId'],
   })
   .refine(
     (data) => {
@@ -39,6 +53,40 @@ const SUBMIT_VOTE_SCHEMA = z
       path: ['root'],
     },
   );
+
+/**
+ * Resolve a vote's solution namespace across every registered runtime. For NR
+ * votes the body contains noderedId; for n8n votes it contains solutionId
+ * directly. Returns null if the identifier matches nothing known.
+ */
+const resolveSolutionNamespace = async (
+  noderedId: string | undefined,
+  solutionId: string | undefined,
+): Promise<string | null> => {
+  // solutionId path: chain-level namespace is the value itself; we just need
+  // to verify that some runtime has it installed so stale votes get dropped.
+  if (solutionId != null) {
+    for (const rt of ALL_RUNTIMES) {
+      const installed: string[] = await rt.getAllInstalledSolutionsNames();
+
+      if (installed.includes(solutionId)) {
+        return solutionId;
+      }
+    }
+
+    return null;
+  }
+
+  if (noderedId == null) return null;
+
+  for (const rt of ALL_RUNTIMES) {
+    const ns: string | null = await rt.getSolutionNamespace(noderedId);
+
+    if (ns != null) return ns;
+  }
+
+  return null;
+};
 
 const queue: queueAsPromised<VoteTask> = fastq.promise(asyncWorker, 4);
 
@@ -102,12 +150,16 @@ export const createVoteRouter = (): express.Router => {
   voteRouter.post(
     '/sse/:id',
     asyncHandler(async (req, res) => {
-      const { hashVote, id, noderedId, root } = SUBMIT_VOTE_SCHEMA.parse(req.body);
+      const parsed = SUBMIT_VOTE_SCHEMA.parse(req.body);
+      const { hashVote, id, noderedId, solutionId, root } = parsed;
 
-      const solutionNamespace: string | null = await getSolutionNamespace(noderedId);
+      const solutionNamespace: string | null = await resolveSolutionNamespace(
+        noderedId,
+        solutionId,
+      );
 
       if (solutionNamespace == null) {
-        voteQueueLogger.error({ solutionNamespace }, 'solution is not present in nodered');
+        voteQueueLogger.error({ noderedId, solutionId }, 'vote target not found in any runtime');
 
         res.status(204).json();
 
@@ -116,7 +168,10 @@ export const createVoteRouter = (): express.Router => {
 
       const payload = {
         votingRoundId: id,
-        noderedId,
+        // noderedId kept in the task type for log compatibility; when the
+        // caller sends solutionId instead, we fill in a synthetic value so
+        // downstream code still has something to put in logs.
+        noderedId: noderedId ?? `n8n:${solutionNamespace}`,
         vote: root,
         solutionNamespace,
         hashVote,

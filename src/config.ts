@@ -131,6 +131,25 @@ export const ENV_SCHEMA = z.object({
     .default('https://marketplace-cdn.energyweb.org/base_urls.json')
     .describe('Base URLs of EWX resources'),
   BUILD_METADATA_PATH: z.string().default('./build.json').describe('Path to build metadata file'),
+  N8N_INTERNAL_PORT: z.coerce
+    .number()
+    .positive()
+    .default(5678)
+    .describe(
+      'Port that the embedded n8n child process binds to on 127.0.0.1. Only used when any subscribed solution has executionEnvironment set to N8nV1. Never exposed outside the loopback interface.',
+    ),
+  DEV_RUNTIME_OVERRIDES: z
+    .string()
+    .optional()
+    .describe(
+      'Comma-separated solutionId=runtimeId pairs that force a specific runtime for a specific solution, regardless of what the chain says. Example: "vcc-1=n8n,other-sol=node-red". Dev-only; not for production deployments because different operators with different overrides will split votes across runtimes.',
+    ),
+  DEV_LOCAL_FLOW_OVERRIDES: z
+    .string()
+    .optional()
+    .describe(
+      'Comma-separated solutionId=filePath pairs that read the flow JSON from a local file instead of IPFS. Example: "vcc-1=./test-flows/vcc-1.json". Dev-only.',
+    ),
 });
 
 export const MAIN_CONFIG: z.infer<typeof ENV_SCHEMA> = (process.env.__SKIP_PARSE_CONFIG === 'true'

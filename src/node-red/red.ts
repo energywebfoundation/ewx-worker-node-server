@@ -26,7 +26,8 @@ type EWX_ENVS =
   | 'EWX_RPC_URL'
   | 'BASE_URL'
   | 'EWX_SQLITE_PATH'
-  | 'EWX_WORKER_ADDRESS';
+  | 'EWX_WORKER_ADDRESS'
+  | 'VCC_PROXY_URL';
 
 const redLogger = createLogger('NodeRed');
 
@@ -96,6 +97,10 @@ export const startRedServer = async (app: express.Express): Promise<http.Server>
 
   const functionGlobalContext = {
     rpcUrl: MAIN_CONFIG.PALLET_RPC_URL,
+    snarkjs: require('snarkjs'),
+    http: require('http'),
+    https: require('https'),
+    crypto: require('crypto'),
   };
 
   rmSync(MAIN_CONFIG.RED_DIRECTORY, {
@@ -532,6 +537,11 @@ export const modifyFlowIds = (
       name: 'EWX_RPC_URL',
       value: rpcUrl,
     },
+    {
+      type: 'str',
+      name: 'VCC_PROXY_URL',
+      value: MAIN_CONFIG.VCC_PROXY_URL,
+    },
   ];
 
   parsedFlow.env = flowEwxEnvs;
@@ -543,35 +553,32 @@ export const modifyFlowIds = (
     parsedFlow.configs = [];
   }
 
+  const ewxEnvConfig = {
+    EWX_SOLUTION_ID: solutionId,
+    EWX_SOLUTION_GROUP_ID: solutionGroupId,
+    EWX_WORKLOGIC_ID: workLogic,
+    EWX_SQLITE_PATH: sqlitePath,
+    EWX_WORKER_ADDRESS: workerAddress,
+    EWX_RPC_URL: MAIN_CONFIG.PALLET_RPC_URL,
+    BASE_URL: MAIN_CONFIG.BASE_URLS,
+    VCC_PROXY_URL: MAIN_CONFIG.VCC_PROXY_URL,
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parsedFlow.configs = parsedFlow.configs.map((configContent: any) => {
     return {
       ...configContent,
-      __envConfig: {
-        EWX_SOLUTION_ID: solutionId,
-        EWX_SOLUTION_GROUP_ID: solutionGroupId,
-        EWX_WORKLOGIC_ID: workLogic,
-        EWX_SQLITE_PATH: sqlitePath,
-        EWX_WORKER_ADDRESS: workerAddress,
-        EWX_RPC_URL: MAIN_CONFIG.PALLET_RPC_URL,
-        BASE_URL: MAIN_CONFIG.BASE_URLS,
-      },
+      __envConfig: ewxEnvConfig,
     };
   });
 
   parsedFlow.nodes = parsedFlow.nodes.map((nodeContent: any) => {
-    return {
+    const node = {
       ...nodeContent,
-      __envConfig: {
-        EWX_SOLUTION_ID: solutionId,
-        EWX_SOLUTION_GROUP_ID: solutionGroupId,
-        EWX_WORKLOGIC_ID: workLogic,
-        EWX_SQLITE_PATH: sqlitePath,
-        EWX_WORKER_ADDRESS: workerAddress,
-        EWX_RPC_URL: MAIN_CONFIG.PALLET_RPC_URL,
-        BASE_URL: MAIN_CONFIG.BASE_URLS,
-      },
+      __envConfig: ewxEnvConfig,
     };
+
+    return node;
   });
 
   const uniqueIds = new Set<string>(parsedFlow.nodes.map((f) => f.id));

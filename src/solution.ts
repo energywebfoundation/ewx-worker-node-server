@@ -1,12 +1,5 @@
 import { type ApiPromise } from '@polkadot/api';
 import { type KeyringPair } from '@polkadot/keyring/types';
-import {
-  deleteNodeById,
-  deleteNodesBySolutionGroupId,
-  getNodeEnv,
-  getTabNodes,
-  upsertSolution,
-} from './node-red/red';
 import { type Logger } from 'pino';
 import { MAIN_CONFIG } from './config';
 import { type NodeRedSolutionCache, setNodeRedSolutionCache } from './node-red/node-red-cache';
@@ -27,7 +20,9 @@ import { type SolutionGroup } from './polkadot/polka-types';
 import { sleep } from './util/sleep';
 import { createLogger } from './util/logger';
 import { createReadPalletApi } from './util/pallet-api';
-import { type RedNode, type RedNodes } from './node-red/types';
+import { ALL_RUNTIMES, getLocalFlowOverride, pickRuntimeForSolution } from './runtime/registry';
+import { type InstalledSolutionHandle, type Runtime } from './runtime/runtime';
+import { getSmartFlow } from './solution-source/solution-source';
 import {
   solutionGroupCache,
   solutionNameCache,
@@ -37,8 +32,6 @@ import {
 const logger = createLogger('SolutionLoop');
 
 export const pushToQueue = async (account: KeyringPair): Promise<void> => {
-  // eslint-disable-next-line no-constant-condition
-
   const timeout: number = MAIN_CONFIG.SOLUTION_QUEUE_PROCESS_DELAY;
 
   // eslint-disable-next-line no-constant-condition
@@ -65,18 +58,49 @@ export const pushToQueue = async (account: KeyringPair): Promise<void> => {
   }
 };
 
-const setNodeRedCache = (tabNodes: RedNodes): void => {
-  const cached = tabNodes.reduce<NodeRedSolutionCache>((acc, curr) => {
-    if (curr.label == null) {
-      return acc;
-    }
+/**
+ * Refresh the NR-side logger cache so NR-origin log lines can be tagged with
+ * the solution namespace they belong to. Skipped for other runtimes because
+ * their logs flow through their own pipes.
+ */
+const refreshNodeRedCache = async (): Promise<void> => {
+  const nr: Runtime | undefined = ALL_RUNTIMES.find((r) => r.id === 'node-red');
 
-    acc[curr.id] = curr.label ?? 'NodeRedServer';
+  if (nr == null) return;
+
+  const handles: InstalledSolutionHandle[] = await nr.getInstalledSolutionHandles();
+  const cached = handles.reduce<NodeRedSolutionCache>((acc, h) => {
+    if (h.solutionId != null) {
+      acc[h.runtimeInternalId] = h.solutionId;
+    }
 
     return acc;
   }, {});
 
   setNodeRedSolutionCache(cached);
+};
+
+interface HandleWithRuntime extends InstalledSolutionHandle {
+  runtime: Runtime;
+}
+
+/**
+ * Collect installed-solution handles from every registered runtime in one go.
+ * The drop-* helpers operate across all runtimes so a solution can migrate
+ * between runtimes on chain and the old-runtime installation is cleaned up.
+ */
+const getAllInstalledHandles = async (): Promise<HandleWithRuntime[]> => {
+  const out: HandleWithRuntime[] = [];
+
+  for (const rt of ALL_RUNTIMES) {
+    const handles: InstalledSolutionHandle[] = await rt.getInstalledSolutionHandles();
+
+    for (const h of handles) {
+      out.push({ ...h, runtime: rt });
+    }
+  }
+
+  return out;
 };
 
 async function processSolutionQueue(api: ApiPromise, workerAccount: KeyringPair): Promise<void> {
@@ -113,12 +137,9 @@ async function processSolutionQueue(api: ApiPromise, workerAccount: KeyringPair)
 
   logger.info({ operatorSubscriptions, operatorAddress }, `found operator subscriptions`);
 
-  const tabNodes: RedNodes = await getTabNodes();
+  let installedHandles: HandleWithRuntime[] = await getAllInstalledHandles();
 
-  const tabNodesWithoutUnsubscribedSolutionGroups: RedNodes = await dropUnsubscribedGroups(
-    tabNodes,
-    operatorSubscriptions,
-  );
+  await dropUnsubscribedGroups(installedHandles, operatorSubscriptions);
 
   const unfilteredSolutions: SolutionArray = await getSolutions(api, operatorSubscriptions);
 
@@ -136,23 +157,23 @@ async function processSolutionQueue(api: ApiPromise, workerAccount: KeyringPair)
     operatorSubscriptions.includes(solution[1]),
   );
 
-  const solutionsWithoutSubscribedSolutionGroup = unfilteredSolutions.filter(
+  const solutionsWithoutSubscribedSolutionGroup: SolutionArray = unfilteredSolutions.filter(
     (solution) => !operatorSubscriptions.includes(solution[1]),
   );
 
-  const tabNodesWithoutInactiveSolutions: RedNodes = await dropInactiveSolutions(
-    tabNodesWithoutUnsubscribedSolutionGroups,
-    solutions,
-  );
+  installedHandles = await getAllInstalledHandles();
+  await dropInactiveSolutions(installedHandles, solutions);
 
-  const tabNodesWithoutInvalidSolutionGroups: RedNodes = await dropSolutionsWithoutSolutionGroup(
-    tabNodesWithoutInactiveSolutions,
+  installedHandles = await getAllInstalledHandles();
+  await dropSolutionsWithoutSolutionGroup(
+    installedHandles,
     solutionsWithoutSubscribedSolutionGroup,
     logger,
   );
 
+  installedHandles = await getAllInstalledHandles();
   await dropUnsubscribedSolutions(
-    tabNodesWithoutInvalidSolutionGroups,
+    installedHandles,
     solutionsWithoutSubscribedSolutionGroup,
     logger,
   );
@@ -174,10 +195,11 @@ async function processSolutionQueue(api: ApiPromise, workerAccount: KeyringPair)
     return;
   }
 
+  // Precompute which solution groups have a valid configuration, so we can
+  // cheaply filter out solutions belonging to a group that doesn't qualify.
   const solutionGroupStatus = new Set<string>();
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  for (const [_, solutionGroup] of Object.entries(solutionGroups)) {
+  for (const solutionGroup of Object.values(solutionGroups)) {
     const hasValidConfiguration: boolean = await hasValidGroupConfiguration(
       api,
       operatorAddress,
@@ -196,43 +218,83 @@ async function processSolutionQueue(api: ApiPromise, workerAccount: KeyringPair)
     solutionGroupStatus.add(solutionGroup.namespace);
   }
 
+  // Refresh once more so cross-runtime migration logic below sees latest state.
+  installedHandles = await getAllInstalledHandles();
+
   for (const solution of activeTargetSolutions) {
-    const workLogic: string = solution[2].workload.workLogic;
+    const solutionId: string = solution[0];
+    const solutionGroupId: string = solution[1];
+    const solutionBody = solution[2];
+    const workLogic: string = solutionBody.workload.workLogic;
 
-    const fulfillsSolutionGroupCriteria = solutionGroupStatus.has(solution[1]);
-
-    if (!fulfillsSolutionGroupCriteria) {
+    if (!solutionGroupStatus.has(solutionGroupId)) {
       logger.warn(
-        {
-          solutionId: solution[0],
-          solutionGroupId: solution[1],
-        },
+        { solutionId, solutionGroupId },
         'solution is not going to be installed due to not meeting criteria',
       );
 
       continue;
     }
 
-    await upsertSolution(
-      solution[1],
-      solution[0],
-      solution[2],
-      workLogic,
-      MAIN_CONFIG.EXCLUDED_NODES,
-      workerAccount.address,
-    ).catch((e) => {
-      logger.error(
-        { solutionId: solution[0], solutionGroupId: solution[1] },
-        `failed to upsert solution to node red`,
+    const runtime: Runtime | null = pickRuntimeForSolution(solutionId, solutionBody);
+
+    if (runtime == null) {
+      // pickRuntimeForSolution already logged the reason.
+      continue;
+    }
+
+    // If this solution is installed in a different runtime (because the chain
+    // flipped its executionEnvironment, or DEV_RUNTIME_OVERRIDES changed
+    // between boots), remove it from the old runtime before installing fresh.
+    const current = installedHandles.find((h) => h.solutionId === solutionId);
+
+    if (current != null && current.runtime.id !== runtime.id) {
+      logger.info(
+        { solutionId, oldRuntime: current.runtime.id, newRuntime: runtime.id },
+        'solution migrated between runtimes; removing from old runtime',
       );
 
-      logger.error(e);
-    });
+      await current.runtime.deleteBySolutionId(solutionId);
+    }
+
+    // Flow content: DEV_LOCAL_FLOW_OVERRIDES wins for iteration-friendly dev,
+    // otherwise fetch via the normal IPFS/local pipeline.
+    const derivedLogger = logger.child({ solutionId, solutionGroupId, worklogicId: workLogic });
+
+    let flowContent: string | null = getLocalFlowOverride(solutionId);
+
+    if (flowContent != null) {
+      derivedLogger.info('using DEV_LOCAL_FLOW_OVERRIDES for flow content');
+    } else {
+      flowContent = await getSmartFlow(workLogic, derivedLogger);
+    }
+
+    if (flowContent == null) {
+      derivedLogger.error('no flow content available for solution; skipping');
+
+      continue;
+    }
+
+    await runtime
+      .upsertSolution({
+        solutionGroupId,
+        solutionId,
+        solution: solutionBody,
+        workLogicId: workLogic,
+        excludedNodes: MAIN_CONFIG.EXCLUDED_NODES,
+        workerAddress: workerAccount.address,
+        flowContent,
+      })
+      .catch((e: Error) => {
+        logger.error(
+          { solutionId, solutionGroupId, runtime: runtime.id },
+          `failed to upsert solution to ${runtime.id}`,
+        );
+        logger.error(e);
+      });
   }
 
-  const refreshedTabNodes: RedNodes = await getTabNodes();
-
-  setNodeRedCache(refreshedTabNodes);
+  await refreshNodeRedCache();
 
   await sleep(30000);
 }
@@ -246,9 +308,7 @@ const hasValidGroupConfiguration = async (
 
   if (currentBlockNumber == null) {
     logger.info(
-      {
-        solutionGroupId: solutionGroup.namespace,
-      },
+      { solutionGroupId: solutionGroup.namespace },
       'unable to receive current block number',
     );
 
@@ -292,131 +352,106 @@ const hasValidGroupConfiguration = async (
   return true;
 };
 
-const dropSolutionsWithoutSolutionGroup = async (
-  tabNodes: RedNodes,
-  solutions: SolutionArray,
-  logger: Logger,
-): Promise<RedNodes> => {
-  const deletedEmptySolutions: string[] = [];
-
-  for (const [solutionId, solutionGroupId, ,] of solutions) {
-    if (solutionGroupId == null) {
-      const tabNode = tabNodes.find((x) => getNodeEnv(x, 'EWX_SOLUTION_ID') === solutionId);
-
-      if (tabNode == null) {
-        continue;
-      }
-
-      await deleteNodeById(tabNode.id);
-
-      deletedEmptySolutions.push(solutionId);
-    }
-  }
-
-  if (deletedEmptySolutions.length > 0) {
-    logger.info(
-      {
-        deletedEmptySolutions,
-      },
-      `deleted solutions without solution group`,
-    );
-  }
-
-  return await getTabNodes();
-};
-
-const dropUnsubscribedSolutions = async (
-  tabNodes: RedNodes,
-  solutions: SolutionArray,
-  logger: Logger,
-): Promise<RedNodes> => {
-  const installedSolutionIds: string[] = [
-    ...new Set(tabNodes.map((x) => getNodeEnv(x, 'EWX_SOLUTION_ID'))),
-  ].filter((x) => x != null);
-
-  const deletedSolutionsIds: string[] = [];
-
-  for (const installedSolutionId of installedSolutionIds) {
-    const matchingSolution = solutions.find((x) => x[0] === installedSolutionId);
-
-    if (matchingSolution == null) {
-      continue;
-    }
-
-    const tabNode: RedNode | undefined = tabNodes.find((t) => getNodeEnv(t, 'EWX_SOLUTION_ID'));
-
-    if (tabNode == null) {
-      continue;
-    }
-
-    const solutionInstalledSolutionGroupId = getNodeEnv(tabNode, 'EWX_SOLUTION_GROUP_ID');
-
-    if (solutionInstalledSolutionGroupId == null) {
-      await deleteNodeById(tabNode.id);
-    }
-
-    if (solutionInstalledSolutionGroupId !== matchingSolution[1]) {
-      await deleteNodeById(tabNode.id);
-    }
-  }
-
-  if (deletedSolutionsIds.length > 0) {
-    logger.info(
-      {
-        deletedSolutionsIds,
-      },
-      'removed unsubscribed solutions',
-    );
-  }
-
-  return await getTabNodes();
-};
-
-const dropInactiveSolutions = async (
-  tabNodes: RedNodes,
-  solutions: SolutionArray,
-): Promise<RedNodes> => {
-  const inactiveSolutions: SolutionArray = solutions.filter((s) => s[3] !== 'Active');
-
-  logger.info(
-    {
-      inactiveSolutions: inactiveSolutions.map((x) => x[0]),
-    },
-    `dropping inactive solutions`,
-  );
-
-  for (const solution of inactiveSolutions) {
-    const tabNode: RedNode | undefined = tabNodes.find((t) => t.label === solution[0]);
-
-    if (tabNode == null) {
-      continue;
-    }
-
-    await deleteNodeById(tabNode.id);
-  }
-
-  return await getTabNodes();
-};
-
+/**
+ * Remove installations whose on-chain solutionGroupId is not currently
+ * subscribed by this operator. Applied per-runtime so every runtime's state
+ * is reconciled.
+ */
 const dropUnsubscribedGroups = async (
-  tabNodes: RedNodes,
+  installedHandles: HandleWithRuntime[],
   operatorSubscriptions: string[],
-): Promise<RedNodes> => {
-  const installedSolutionGroupTabsIds: string[] = [
-    ...new Set(tabNodes.map((x) => getNodeEnv(x, 'EWX_SOLUTION_GROUP_ID'))),
-  ].filter((x) => x != null);
+): Promise<void> => {
+  const uniqueGroupIds: string[] = [
+    ...new Set(
+      installedHandles.map((h) => h.solutionGroupId).filter((g): g is string => g != null),
+    ),
+  ];
 
-  const unsubscribedSolutionGroupsIds: string[] = installedSolutionGroupTabsIds.filter(
-    (element) => !operatorSubscriptions.includes(element),
-  );
+  const unsubscribed: string[] = uniqueGroupIds.filter((g) => !operatorSubscriptions.includes(g));
 
-  if (unsubscribedSolutionGroupsIds.length === 0) {
-    return await getTabNodes();
+  if (unsubscribed.length === 0) return;
+
+  logger.info({ unsubscribedSolutionGroupsIds: unsubscribed }, `dropping unsubscribed groups`);
+
+  for (const rt of ALL_RUNTIMES) {
+    await rt.deleteNodesBySolutionGroupId(unsubscribed);
+  }
+};
+
+/** Remove installations for on-chain solutions that are no longer Active. */
+const dropInactiveSolutions = async (
+  installedHandles: HandleWithRuntime[],
+  solutions: SolutionArray,
+): Promise<void> => {
+  const inactive: SolutionArray = solutions.filter((s) => s[3] !== 'Active');
+
+  if (inactive.length === 0) return;
+
+  logger.info({ inactiveSolutions: inactive.map((x) => x[0]) }, `dropping inactive solutions`);
+
+  for (const solution of inactive) {
+    const solutionId: string = solution[0];
+    const handle = installedHandles.find((h) => h.solutionId === solutionId);
+
+    if (handle == null) continue;
+
+    await handle.runtime.deleteBySolutionId(solutionId);
+  }
+};
+
+/**
+ * Remove installations whose on-chain solution has no solutionGroupId
+ * configured (a known edge case).
+ */
+const dropSolutionsWithoutSolutionGroup = async (
+  installedHandles: HandleWithRuntime[],
+  solutions: SolutionArray,
+  logger: Logger,
+): Promise<void> => {
+  const deleted: string[] = [];
+
+  for (const [solutionId, solutionGroupId] of solutions) {
+    if (solutionGroupId != null) continue;
+
+    const handle = installedHandles.find((h) => h.solutionId === solutionId);
+
+    if (handle == null) continue;
+
+    await handle.runtime.deleteBySolutionId(solutionId);
+    deleted.push(solutionId);
   }
 
-  logger.info({ unsubscribedSolutionGroupsIds }, `dropping unsubscribed solution groups`);
+  if (deleted.length > 0) {
+    logger.info({ deletedEmptySolutions: deleted }, `deleted solutions without solution group`);
+  }
+};
 
-  await deleteNodesBySolutionGroupId(unsubscribedSolutionGroupsIds);
+/**
+ * Remove installations whose solutionGroupId on the chain differs from what
+ * the installed instance has recorded, meaning the solution was moved to a
+ * different group since our last reconcile.
+ */
+const dropUnsubscribedSolutions = async (
+  installedHandles: HandleWithRuntime[],
+  solutions: SolutionArray,
+  logger: Logger,
+): Promise<void> => {
+  const deleted: string[] = [];
 
-  return await getTabNodes();
+  for (const handle of installedHandles) {
+    if (handle.solutionId == null || handle.solutionGroupId == null) continue;
+
+    const matching = solutions.find((s) => s[0] === handle.solutionId);
+
+    if (matching == null) continue;
+
+    if (matching[1] !== handle.solutionGroupId) {
+      await handle.runtime.deleteBySolutionId(handle.solutionId);
+      deleted.push(handle.solutionId);
+    }
+  }
+
+  if (deleted.length > 0) {
+    logger.info({ deletedSolutionsIds: deleted }, 'removed unsubscribed solutions');
+  }
 };

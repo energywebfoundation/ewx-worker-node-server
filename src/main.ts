@@ -1,6 +1,5 @@
 import { type ApiPromise } from '@polkadot/api';
 import { cryptoWaitReady } from '@polkadot/util-crypto';
-import { deleteAll, startRedServer } from './node-red/red';
 import express from 'express';
 import bodyParser from 'body-parser';
 import { pushToQueue } from './solution';
@@ -20,6 +19,7 @@ import { createTokenRouter } from './routes/token';
 import { createAdminRouter } from './routes/admin';
 import { setMainServer, setNodeRedServer, setAdminServer } from './shutdown';
 import { MAIN_CONFIG } from './config';
+import { startAllRuntimes, deleteAllFromAllRuntimes } from './runtime/registry';
 
 const logger = createLogger('WorkerNode');
 
@@ -97,12 +97,19 @@ const bootstrap = async (): Promise<void> => {
 
   await registerWorker(account);
 
-  const nodeRedServer = await startRedServer(app);
-  setNodeRedServer(nodeRedServer);
+  const runtimeServers = await startAllRuntimes(app);
+
+  // Graceful shutdown tracks Node-RED's http.Server so it can close gracefully
+  // on SIGTERM. n8n is a child process, not an http.Server, so it's tracked
+  // inside n8n-runtime and terminated there on shutdown.
+  const nodeRedServer = runtimeServers['node-red'];
+  if (nodeRedServer != null) {
+    setNodeRedServer(nodeRedServer);
+  }
 
   setAppState(APP_BOOTSTRAP_STATUS.STARTED_RED_SERVER);
 
-  await deleteAll();
+  await deleteAllFromAllRuntimes();
 
   await api.disconnect();
 

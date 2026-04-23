@@ -3,22 +3,40 @@ import { cryptoWaitReady } from '@polkadot/util-crypto';
 import { deleteAll, startRedServer } from './node-red/red';
 import express from 'express';
 import bodyParser from 'body-parser';
-import { createVoteRouter } from './vote';
 import { pushToQueue } from './solution';
-import { createHealthRouter } from './health';
 import { runChecks } from './checks';
-import { createKeyringPair } from './account';
-import { APP_BOOTSTRAP_STATUS, createStatusRouter, setAppState } from './status';
-import { createLogger, createReadPalletApi } from './util';
-import { createConfigRouter } from './worker-config';
 import { retryHttpAsyncCall } from './polkadot/polka';
-import { startHeartbeat } from './heartbeat';
-import { registerWorker } from './registry';
+import { createLogger } from './util/logger';
+import { createReadPalletApi } from './util/pallet-api';
+import { APP_BOOTSTRAP_STATUS, setAppState } from './util/status';
+import { createKeyringPair } from './polkadot/account';
+import { registerWorker } from './auth/registry';
+import { startHeartbeat } from './health/heartbeat';
+import { createHealthRouter } from './routes/health';
+import { createVoteRouter } from './routes/vote';
+import { createStatusRouter } from './routes/status';
+import { createConfigRouter } from './routes/worker-config';
+import { createTokenRouter } from './routes/token';
+import { createAdminRouter } from './routes/admin';
+import { setMainServer, setNodeRedServer, setAdminServer } from './shutdown';
+import { MAIN_CONFIG } from './config';
 
-void (async () => {
+const logger = createLogger('WorkerNode');
+
+const registerProcessHandlers = (): void => {
+  process.on('unhandledRejection', (reason) => {
+    logger.error({ reason }, 'unhandled promise rejection');
+  });
+
+  process.on('uncaughtException', (error) => {
+    logger.error({ err: error }, 'uncaught exception');
+  });
+};
+
+const bootstrap = async (): Promise<void> => {
+  registerProcessHandlers();
+
   setAppState(APP_BOOTSTRAP_STATUS.STARTED);
-
-  const logger = createLogger('WorkerNode');
 
   const app = express();
 
@@ -28,6 +46,7 @@ void (async () => {
   const healthRouter: express.Router | null = createHealthRouter();
 
   app.use(createVoteRouter());
+  app.use(createTokenRouter());
   app.use(createStatusRouter());
   app.use(createConfigRouter());
 
@@ -37,9 +56,21 @@ void (async () => {
     app.use(healthRouter);
   }
 
-  app.listen(3002, () => {
+  const mainServer = app.listen(3002, () => {
     logger.info(`vote API exposed on port 3002`);
   });
+  setMainServer(mainServer);
+
+  // Start admin server separately
+  const adminApp = express();
+  adminApp.use(bodyParser.json());
+  adminApp.use(bodyParser.urlencoded({ extended: false }));
+  adminApp.use(createAdminRouter());
+
+  const adminServer = adminApp.listen(MAIN_CONFIG.ADMIN_SERVER_PORT, () => {
+    logger.info(`admin API exposed on port ${MAIN_CONFIG.ADMIN_SERVER_PORT}`);
+  });
+  setAdminServer(adminServer);
 
   setAppState(APP_BOOTSTRAP_STATUS.EXPOSED_HTTP);
 
@@ -66,7 +97,8 @@ void (async () => {
 
   await registerWorker(account);
 
-  await startRedServer(app);
+  const nodeRedServer = await startRedServer(app);
+  setNodeRedServer(nodeRedServer);
 
   setAppState(APP_BOOTSTRAP_STATUS.STARTED_RED_SERVER);
 
@@ -80,4 +112,8 @@ void (async () => {
 
   logger.info('starting heartbeat');
   startHeartbeat();
-})();
+};
+
+void bootstrap().catch((error) => {
+  logger.error({ err: error }, 'bootstrap failed');
+});

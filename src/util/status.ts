@@ -1,5 +1,4 @@
-import express from 'express';
-import { createLogger } from './util';
+import { createLogger } from './logger';
 
 export enum APP_BOOTSTRAP_STATUS {
   STARTED = 'STARTED',
@@ -14,6 +13,8 @@ const statusLogger = createLogger('AppBootstrapStatus');
 
 let APP_STATE: APP_BOOTSTRAP_STATUS = APP_BOOTSTRAP_STATUS.STARTED;
 
+export const getAppState = (): APP_BOOTSTRAP_STATUS => APP_STATE;
+
 export const setAppState = (state: APP_BOOTSTRAP_STATUS): void => {
   statusLogger.info(
     {
@@ -24,16 +25,4 @@ export const setAppState = (state: APP_BOOTSTRAP_STATUS): void => {
   );
 
   APP_STATE = state;
-};
-
-export const createStatusRouter = (): express.Router => {
-  const statusRouter = express.Router({ mergeParams: true });
-
-  statusRouter.get('/status', (_, res) => {
-    res.status(200).json({
-      status: APP_STATE,
-    });
-  });
-
-  return statusRouter;
 };

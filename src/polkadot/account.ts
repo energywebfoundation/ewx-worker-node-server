@@ -1,12 +1,19 @@
-import { MAIN_CONFIG } from './config';
 import { type KeyringPair } from '@polkadot/keyring/types';
 import { Keyring } from '@polkadot/api';
+import { MAIN_CONFIG } from '../config';
+import { MissingVotingWorkerSeedError } from '../errors';
+
+let keyringPair: KeyringPair | null = null;
 
 export const createKeyringPair = (): KeyringPair => {
+  if (keyringPair != null) {
+    return keyringPair;
+  }
+
   const property: string = MAIN_CONFIG.VOTING_WORKER_SEED;
 
   if (property === '' || property == null) {
-    throw new Error('Missing VOTING_WORKER_SEED');
+    throw new MissingVotingWorkerSeedError();
   }
 
   const keyring = new Keyring({ type: 'sr25519', ss58Format: 42 });
@@ -15,5 +22,7 @@ export const createKeyringPair = (): KeyringPair => {
     return keyring.addFromUri(property.replace('_', ''));
   }
 
-  return keyring.addFromMnemonic(property);
+  keyringPair = keyring.addFromMnemonic(property);
+
+  return keyringPair;
 };

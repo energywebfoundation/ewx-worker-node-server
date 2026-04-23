@@ -1,4 +1,4 @@
-import { invertObject } from '../util';
+import { invertObject } from '../util/invert-object';
 
 type NodeRedZId = string;
 type SolutionNamespace = string;

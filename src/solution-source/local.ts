@@ -1,6 +1,7 @@
 import pino from 'pino';
 import { MAIN_CONFIG } from '../config';
 import { existsSync, readFileSync } from 'fs';
+import { LocalSolutionsFileNotFoundError } from '../errors';
 
 const localLogger = pino({
   name: 'LocalReaderLogger',
@@ -15,7 +16,7 @@ if (MAIN_CONFIG.LOCAL_SOLUTIONS_PATH != null) {
       `smartflow file on this path does not exists`,
     );
 
-    throw new Error('smartflow file on this path does not exists');
+    throw new LocalSolutionsFileNotFoundError();
   }
 }
 

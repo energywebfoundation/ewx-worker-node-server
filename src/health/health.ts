@@ -1,8 +1,7 @@
-import { createLogger } from './util';
-import { getAllInstalledSolutionsNames, runtimeStarted } from './node-red/red';
-import express from 'express';
-import asyncHandler from 'express-async-handler';
-import { MAIN_CONFIG } from './config';
+import { getAllInstalledSolutionsNames, runtimeStarted } from '../node-red/red';
+import { createKeyringPair } from '../polkadot/account';
+import { MAIN_CONFIG } from '../config';
+import { getOperatorInfo, type OperatorInfo } from '../util/operator-info';
 
 enum HealthStatus {
   OK = 'OK',
@@ -13,37 +12,6 @@ enum ComponentName {
   RED = 'NODE_RED',
   READY = 'READY',
 }
-
-export const createHealthRouter = (): express.Router | null => {
-  if (!MAIN_CONFIG.ENABLE_HEALTH_API) {
-    return null;
-  }
-
-  const healthLogger = createLogger('Health');
-
-  const healthRouter: express.Router = express.Router({ mergeParams: true });
-
-  healthRouter.get('/health/liveness', (req, res) => {
-    const health = isLive();
-
-    healthLogger.debug('requested liveness');
-
-    res.json(health);
-  });
-
-  healthRouter.get(
-    '/health/readiness',
-    asyncHandler(async (req, res) => {
-      const result = await isReady();
-
-      healthLogger.debug(result, 'requested readiness');
-
-      res.json(result);
-    }),
-  );
-
-  return healthRouter;
-};
 
 interface ComponentHealthStatus {
   status: HealthStatus;
@@ -58,14 +26,21 @@ interface NodeRedHealthStatus extends ComponentHealthStatus {
   };
 }
 
-const isLive = (): ComponentHealthStatus => {
+interface SolutionGroupsDetailsStatus {
+  timestamp: string;
+  rpcUrl?: string;
+  workerAddress?: string;
+  operator?: OperatorInfo | null;
+}
+
+export const isLive = (): ComponentHealthStatus => {
   return {
     status: HealthStatus.OK,
     name: 'LIVE',
   };
 };
 
-const isReady = async (): Promise<ComponentHealthStatus[]> => {
+export const isReady = async (): Promise<ComponentHealthStatus[]> => {
   return [await getNodeRedHealth()];
 };
 
@@ -92,5 +67,28 @@ export const getNodeRedHealth = async (): Promise<NodeRedHealthStatus> => {
       installedSolutions,
       installedSolutionsCount: installedSolutions.length,
     },
+  };
+};
+
+export const getSolutionGroupsDetailsStatus = async (): Promise<SolutionGroupsDetailsStatus> => {
+  const timestamp = new Date().toISOString();
+  const rpcUrl = MAIN_CONFIG.PALLET_RPC_URL;
+
+  let account: ReturnType<typeof createKeyringPair>;
+  try {
+    account = createKeyringPair();
+  } catch {
+    // No worker identity (e.g. config not ready); return config only
+    return { timestamp, rpcUrl };
+  }
+
+  const workerAddress = account.address;
+  const operatorInfo = await getOperatorInfo();
+
+  return {
+    timestamp,
+    rpcUrl,
+    workerAddress,
+    operator: operatorInfo,
   };
 };

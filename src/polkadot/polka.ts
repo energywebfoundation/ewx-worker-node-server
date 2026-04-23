@@ -6,8 +6,9 @@ import { blake2AsHex, cryptoWaitReady } from '@polkadot/util-crypto';
 import pino from 'pino';
 import promiseRetry from 'promise-retry';
 import { type WrapOptions } from 'retry';
-import type { EwxTxManager } from '../ewx-tx-manager';
 import { type Solution, type SolutionGroup } from './polka-types';
+import { type EwxTxManager } from './ewx-tx-manager';
+import { UnableToDecodeSolutionGroup, UnableToObtainStakeError } from '../errors';
 
 export type WorkerAddress = string;
 export type OperatorAddress = string;
@@ -94,7 +95,7 @@ export const getSolutionGroupsByIds = async (
       curr.toPrimitive() as unknown as SolutionGroup;
 
     if (primitive == null) {
-      throw new Error('Unable to decode codec for Solution Group');
+      throw new UnableToDecodeSolutionGroup();
     }
 
     acc[primitive.namespace] = primitive;
@@ -103,8 +104,27 @@ export const getSolutionGroupsByIds = async (
   }, {});
 };
 
-export const getSolutions = async (api: ApiPromise): Promise<SolutionArray> => {
+export const getSolutions = async (
+  api: ApiPromise,
+  operatorSubscriptions: string[],
+): Promise<SolutionArray> => {
   const solutions = await api.query.workerNodePallet.solutions.entries();
+
+  const solutionsWithGroups: Record<string, string> =
+    await api.query.workerNodePallet.groupOfSolution.entries().then((x) => {
+      return x
+        .map(([solutionNamespace, groupOfSolution]) => {
+          return {
+            solutionNamespace: (solutionNamespace.toHuman() as unknown as SolutionId)[0],
+            groupOfSolution: groupOfSolution.toHuman() as unknown as SolutionGroupId,
+          };
+        })
+        .reduce((acc, curr) => {
+          acc[curr.solutionNamespace] = curr.groupOfSolution;
+
+          return acc;
+        }, {});
+    });
 
   const results: SolutionArray = await Promise.all(
     solutions.map(async ([namespaceHash, solution]) => {
@@ -112,12 +132,12 @@ export const getSolutions = async (api: ApiPromise): Promise<SolutionArray> => {
 
       const solutionPrimitive = solution.toPrimitive() as unknown as Solution;
 
-      const groupOfSolution = await api.query.workerNodePallet.groupOfSolution(solutionId);
-
-      const solutionGroupId: string | null =
-        groupOfSolution.toPrimitive() as unknown as SolutionGroupId;
-
-      return [solutionId, solutionGroupId, solutionPrimitive, solutionPrimitive.status];
+      return [
+        solutionId,
+        solutionsWithGroups[solutionId] ?? null,
+        solutionPrimitive,
+        solutionPrimitive.status,
+      ];
     }),
   );
 
@@ -208,7 +228,7 @@ export const queryStake = async (
   );
 
   if (currentStake == null || period == null || nextStake == null) {
-    throw new Error('unable to obtain stake');
+    throw new UnableToObtainStakeError();
   }
 
   return {

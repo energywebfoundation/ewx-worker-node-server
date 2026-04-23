@@ -1,7 +1,7 @@
 import { writeFileSync } from 'fs';
-import { MAIN_CONFIG } from './config';
-import { createLogger } from './util';
-import { runtimeStarted } from './node-red/red';
+import { runtimeStarted } from '../node-red/red';
+import { createLogger } from '../util/logger';
+import { MAIN_CONFIG } from '../config';
 
 const logger = createLogger('Heartbeat');
 

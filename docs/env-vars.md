@@ -40,5 +40,6 @@ _Object containing the following properties:_
 | `SHUTDOWN_TIMEOUT_MS`          | Timeout in milliseconds for graceful shutdown (default: 30000)                                                                                                                                        | `number` (_>0_)             | `30000`                                                  |
 | `ADMIN_SERVER_PORT`            | Port number for admin server (default: 3003)                                                                                                                                                          | `number` (_>0_)             | `3003`                                                   |
 | `ADMIN_API_KEY`                | API key for admin endpoints authentication. Must be at least 32 characters. If not set, admin endpoints will be accessible without authentication.                                                    | `string` (_min length: 32_) |                                                          |
+| `VCC_PROXY_URL`                | VCC proxy URL.                                                                                                                                                                                        | `string` (_url_)            | `'https://ew-vcc-proxy.energyweb.org'`                   |
 
 _(\*) Required._

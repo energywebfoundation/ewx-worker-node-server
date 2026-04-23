@@ -22,7 +22,7 @@
     "prepare": "husky install"
   },
   "dependencies": {
-    "@energyweb/node-red-contrib-energywebx": "0.7.2",
+    "@energyweb/node-red-contrib-energywebx": "0.8.1",
     "@energyweb/node-red-contrib-green-proof-worker": "2.5.1",
     "@polkadot/api": "14.0.1",
     "axios": "1.7.9",
@@ -38,6 +38,7 @@
     "pino-pretty": "13.0.0",
     "pino-roll": "4.0.0",
     "promise-retry": "2.0.1",
+    "snarkjs": "0.7.6",
     "zod": "3.24.1"
   },
   "devDependencies": {

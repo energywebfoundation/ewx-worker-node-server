@@ -170,6 +170,11 @@ export const ENV_SCHEMA = z.object({
     .describe(
       'API key for admin endpoints authentication. Must be at least 32 characters. If not set, admin endpoints will be accessible without authentication.',
     ),
+  VCC_PROXY_URL: z
+    .string()
+    .url()
+    .default('https://ew-vcc-proxy.energyweb.org')
+    .describe('VCC proxy URL.'),
 });
 
 export const MAIN_CONFIG: z.infer<typeof ENV_SCHEMA> = (process.env.__SKIP_PARSE_CONFIG === 'true'

@@ -1,7 +1,13 @@
 import { type Express } from 'express';
-import { type Runtime, type UpsertSolutionInput, type InstalledSolutionHandle } from '../runtime';
+import {
+  type Runtime,
+  type RuntimeHealth,
+  type UpsertSolutionInput,
+  type InstalledSolutionHandle,
+} from '../runtime';
 import {
   startRedServer,
+  runtimeStarted as redRuntimeStarted,
   upsertSolution as redUpsertSolution,
   deleteNodeById,
   deleteAll as redDeleteAll,
@@ -26,11 +32,11 @@ export const nodeRedRuntime: Runtime = {
   // solutions deployed before the runtime-type field existed default to NR.
   executionEnvironments: ['NodeRedV1', ''],
 
-  async start(app: Express): Promise<void> {
+  start: async (app: Express): Promise<void> => {
     await startRedServer(app);
   },
 
-  async upsertSolution(input: UpsertSolutionInput): Promise<void> {
+  upsertSolution: async (input: UpsertSolutionInput): Promise<void> => {
     await redUpsertSolution(
       input.solutionGroupId,
       input.solutionId,
@@ -42,7 +48,7 @@ export const nodeRedRuntime: Runtime = {
     );
   },
 
-  async deleteBySolutionId(solutionId): Promise<void> {
+  deleteBySolutionId: async (solutionId): Promise<void> => {
     const existing = await redGetInstalled(solutionId);
 
     if (existing != null) {
@@ -50,19 +56,19 @@ export const nodeRedRuntime: Runtime = {
     }
   },
 
-  async deleteAll(): Promise<void> {
+  deleteAll: async (): Promise<void> => {
     await redDeleteAll();
   },
 
-  async deleteNodesBySolutionGroupId(solutionGroupIds): Promise<void> {
+  deleteNodesBySolutionGroupId: async (solutionGroupIds): Promise<void> => {
     await redDeleteByGroupIds(solutionGroupIds);
   },
 
-  async getAllInstalledSolutionsNames(): Promise<string[]> {
+  getAllInstalledSolutionsNames: async (): Promise<string[]> => {
     return await redGetAll();
   },
 
-  async getInstalledSolutionHandles(): Promise<InstalledSolutionHandle[]> {
+  getInstalledSolutionHandles: async (): Promise<InstalledSolutionHandle[]> => {
     const tabs = await redGetTabNodes();
 
     return tabs.map((t) => ({
@@ -73,11 +79,23 @@ export const nodeRedRuntime: Runtime = {
     }));
   },
 
-  async getSolutionNamespace(runtimeInternalId): Promise<string | null> {
+  getSolutionNamespace: async (runtimeInternalId): Promise<string | null> => {
     return await redGetSolutionNamespace(runtimeInternalId);
   },
 
-  async getSolutionLogicalParts(runtimeInternalId) {
+  getSolutionLogicalParts: async (runtimeInternalId) => {
     return await redGetLogicalParts(runtimeInternalId);
+  },
+
+  getHealth: async (): Promise<RuntimeHealth> => {
+    const started: boolean = await redRuntimeStarted();
+
+    if (!started) {
+      return { started: false, installedSolutions: [] };
+    }
+
+    const installedSolutions: string[] = await redGetAll();
+
+    return { started: true, installedSolutions };
   },
 };

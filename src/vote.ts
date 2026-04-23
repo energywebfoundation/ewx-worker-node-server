@@ -7,6 +7,7 @@ import * as fastq from 'fastq';
 import { z } from 'zod';
 import { MAIN_CONFIG } from './config';
 import { ALL_RUNTIMES } from './runtime/registry';
+import { type SolutionIdentifier } from './runtime/runtime';
 import { retryHttpAsyncCall, submitSolutionResult } from './polkadot/polka';
 import { createEwxTxManager, createLogger, sleep } from './util';
 
@@ -55,32 +56,29 @@ const SUBMIT_VOTE_SCHEMA = z
   );
 
 /**
- * Resolve a vote's solution namespace across every registered runtime. For NR
- * votes the body contains noderedId; for n8n votes it contains solutionId
- * directly. Returns null if the identifier matches nothing known.
+ * Resolve a vote's solution namespace across every registered runtime. The
+ * caller passes a discriminated identifier so intent is explicit at the call
+ * site (no ambiguous undefined/value pairs).
+ *
+ * For noderedId identifiers we ask each runtime to translate the internal id
+ * into a namespace. For solutionId identifiers we verify some runtime has the
+ * solution installed and return it. Returns null if no runtime knows the id.
  */
-const resolveSolutionNamespace = async (
-  noderedId: string | undefined,
-  solutionId: string | undefined,
-): Promise<string | null> => {
-  // solutionId path: chain-level namespace is the value itself; we just need
-  // to verify that some runtime has it installed so stale votes get dropped.
-  if (solutionId != null) {
+const resolveSolutionNamespace = async (identifier: SolutionIdentifier): Promise<string | null> => {
+  if (identifier.kind === 'solutionId') {
     for (const rt of ALL_RUNTIMES) {
       const installed: string[] = await rt.getAllInstalledSolutionsNames();
 
-      if (installed.includes(solutionId)) {
-        return solutionId;
+      if (installed.includes(identifier.value)) {
+        return identifier.value;
       }
     }
 
     return null;
   }
 
-  if (noderedId == null) return null;
-
   for (const rt of ALL_RUNTIMES) {
-    const ns: string | null = await rt.getSolutionNamespace(noderedId);
+    const ns: string | null = await rt.getSolutionNamespace(identifier.value);
 
     if (ns != null) return ns;
   }
@@ -153,10 +151,26 @@ export const createVoteRouter = (): express.Router => {
       const parsed = SUBMIT_VOTE_SCHEMA.parse(req.body);
       const { hashVote, id, noderedId, solutionId, root } = parsed;
 
-      const solutionNamespace: string | null = await resolveSolutionNamespace(
-        noderedId,
-        solutionId,
-      );
+      // Build the discriminated identifier. The refine() on SUBMIT_VOTE_SCHEMA
+      // guarantees at least one of solutionId or noderedId is present, so this
+      // chain always resolves. solutionId wins when both are sent because it's
+      // the canonical chain-level identifier.
+      let identifier: SolutionIdentifier | null = null;
+
+      if (solutionId != null) {
+        identifier = { kind: 'solutionId', value: solutionId };
+      } else if (noderedId != null) {
+        identifier = { kind: 'noderedId', value: noderedId };
+      }
+
+      if (identifier == null) {
+        // Unreachable given the schema refine, but keeps the type checker happy.
+        res.status(400).json({ error: 'missing solutionId or noderedId' });
+
+        return;
+      }
+
+      const solutionNamespace: string | null = await resolveSolutionNamespace(identifier);
 
       if (solutionNamespace == null) {
         voteQueueLogger.error({ noderedId, solutionId }, 'vote target not found in any runtime');

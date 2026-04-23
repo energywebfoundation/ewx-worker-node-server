@@ -5,6 +5,7 @@ import { nodeRedRuntime } from './node-red/red-runtime';
 import { n8nRuntime } from './n8n/n8n-runtime';
 import { readFileSync, existsSync } from 'fs';
 import { type Solution } from '../polkadot/polka-types';
+import { type Express } from 'express';
 
 const logger = createLogger('RuntimeRegistry');
 
@@ -140,4 +141,37 @@ export const getLocalFlowOverride = (solutionId: string): string | null => {
   }
 
   return readFileSync(filePath, 'utf8');
+};
+
+/**
+ * Start every registered runtime during worker bootstrap. Errors are logged
+ * per-runtime and then swallowed, so a single runtime failing to spawn does
+ * not bring down the worker - solutions routed to the broken runtime will
+ * simply be skipped at pick time.
+ */
+export const startAllRuntimes = async (app: Express): Promise<void> => {
+  for (const rt of ALL_RUNTIMES) {
+    try {
+      await rt.start(app);
+      logger.info({ runtime: rt.id }, 'runtime started');
+    } catch (e) {
+      logger.error(
+        { runtime: rt.id, err: (e as Error).message },
+        'runtime failed to start; solutions routed to it will be skipped',
+      );
+    }
+  }
+};
+
+/**
+ * Wipe leftover installed flows from every registered runtime. Called on boot
+ * so reconcile starts from a clean slate. Errors per-runtime are logged and
+ * swallowed; the reconcile loop will catch up on the next tick regardless.
+ */
+export const deleteAllFromAllRuntimes = async (): Promise<void> => {
+  for (const rt of ALL_RUNTIMES) {
+    await rt.deleteAll().catch((e: Error) => {
+      logger.warn({ runtime: rt.id, err: e.message }, 'deleteAll on boot failed; continuing');
+    });
+  }
 };

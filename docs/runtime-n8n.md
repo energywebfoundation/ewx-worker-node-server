@@ -1,6 +1,6 @@
 # n8n runtime
 
-This document describes the n8n workflow runtime added to the Worker Node. It covers the architecture, lifecycle, auth, known quirks, and operational notes. For general Worker Node documentation see [README.md](./README.md).
+This document describes the n8n workflow runtime added to the Worker Node. It covers the architecture, lifecycle, auth, known quirks, and operational notes. For general Worker Node documentation see [../README.md](../README.md).
 
 ## What this adds
 
@@ -114,7 +114,7 @@ See `test-flows/vcc-1.json` for the canonical example: the code node emits `solu
 
 ## Environment variables
 
-See [docs/env-vars.md](./docs/env-vars.md) for the full list. The ones specific to this runtime:
+See [./env-vars.md](./env-vars.md) for the full list. The ones specific to this runtime:
 
 | Variable                   | Purpose                                                                                               | Default |
 | -------------------------- | ----------------------------------------------------------------------------------------------------- | ------- |

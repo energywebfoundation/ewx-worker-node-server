@@ -13,7 +13,7 @@ import { createConfigRouter } from './worker-config';
 import { retryHttpAsyncCall } from './polkadot/polka';
 import { startHeartbeat } from './heartbeat';
 import { registerWorker } from './registry';
-import { ALL_RUNTIMES } from './runtime/registry';
+import { startAllRuntimes, deleteAllFromAllRuntimes } from './runtime/registry';
 
 void (async () => {
   setAppState(APP_BOOTSTRAP_STATUS.STARTED);
@@ -66,31 +66,11 @@ void (async () => {
 
   await registerWorker(account);
 
-  // Start every registered runtime. NR always starts (it's the default/fallback
-  // and hosts the express middleware). n8n starts only if it's reachable; if
-  // spawning fails, the worker keeps running with NR only and any solution
-  // that needs n8n will be skipped at pick time.
-  for (const rt of ALL_RUNTIMES) {
-    try {
-      await rt.start(app);
-      logger.info({ runtime: rt.id }, 'runtime started');
-    } catch (e) {
-      logger.error(
-        { runtime: rt.id, err: (e as Error).message },
-        'runtime failed to start; solutions routed to it will be skipped',
-      );
-    }
-  }
+  await startAllRuntimes(app);
 
   setAppState(APP_BOOTSTRAP_STATUS.STARTED_RED_SERVER);
 
-  // Wipe any leftover installed flows from prior runs across every runtime
-  // that started successfully, so reconcile starts from a clean slate.
-  for (const rt of ALL_RUNTIMES) {
-    await rt.deleteAll().catch((e: Error) => {
-      logger.warn({ runtime: rt.id, err: e.message }, 'deleteAll on boot failed; continuing');
-    });
-  }
+  await deleteAllFromAllRuntimes();
 
   await api.disconnect();
 

@@ -1,5 +1,4 @@
 import { createLogger } from './util';
-import { getAllInstalledSolutionsNames, runtimeStarted } from './node-red/red';
 import express from 'express';
 import asyncHandler from 'express-async-handler';
 import { MAIN_CONFIG } from './config';
@@ -67,66 +66,49 @@ const isLive = (): ComponentHealthStatus => {
   };
 };
 
+/**
+ * Report health for every registered runtime. The output name 'NODE_RED' is
+ * preserved for back-compat with any external monitoring that keyed off it.
+ */
 const isReady = async (): Promise<ComponentHealthStatus[]> => {
-  // NR health is reported using the legacy check for back-compat with any
-  // monitoring that keyed off name === 'NODE_RED'.
-  const out: ComponentHealthStatus[] = [await getNodeRedHealth()];
+  const out: ComponentHealthStatus[] = [];
 
-  // Report health for every non-NR runtime the worker has registered.
   for (const rt of ALL_RUNTIMES) {
-    if (rt.id === 'node-red') continue;
-
     out.push(await getRuntimeHealth(rt));
   }
 
   return out;
 };
 
-export const getNodeRedHealth = async (): Promise<RuntimeHealthStatus> => {
-  const started = await runtimeStarted();
+const componentNameForRuntime = (rt: Runtime): ComponentName => {
+  if (rt.id === 'node-red') return ComponentName.RED;
+  if (rt.id === 'n8n') return ComponentName.N8N;
 
-  if (!started) {
-    return {
-      status: HealthStatus.ERROR,
-      name: ComponentName.RED,
-      additionalDetails: {
-        installedSolutions: [],
-        installedSolutionsCount: 0,
-      },
-    };
-  }
+  // Exhaustive narrowing; future runtimes added to the Runtime.id union must
+  // be named here. TypeScript will flag them as unhandled.
+  const exhaustive: never = rt.id;
 
-  const installedSolutions: string[] = await getAllInstalledSolutionsNames();
-
-  return {
-    status: HealthStatus.OK,
-    name: ComponentName.RED,
-    additionalDetails: {
-      installedSolutions,
-      installedSolutionsCount: installedSolutions.length,
-    },
-  };
+  throw new Error(`unhandled runtime id: ${exhaustive as string}`);
 };
 
 const getRuntimeHealth = async (rt: Runtime): Promise<RuntimeHealthStatus> => {
-  // For non-NR runtimes we infer "started" from whether listing installed
-  // solutions works. A runtime that failed to boot will typically throw or
-  // return an empty list; either way the report is informative.
+  const name: ComponentName = componentNameForRuntime(rt);
+
   try {
-    const installedSolutions: string[] = await rt.getAllInstalledSolutionsNames();
+    const health = await rt.getHealth();
 
     return {
-      status: HealthStatus.OK,
-      name: rt.id === 'n8n' ? ComponentName.N8N : rt.id.toUpperCase(),
+      status: health.started ? HealthStatus.OK : HealthStatus.ERROR,
+      name,
       additionalDetails: {
-        installedSolutions,
-        installedSolutionsCount: installedSolutions.length,
+        installedSolutions: health.installedSolutions,
+        installedSolutionsCount: health.installedSolutions.length,
       },
     };
   } catch {
     return {
       status: HealthStatus.ERROR,
-      name: rt.id === 'n8n' ? ComponentName.N8N : rt.id.toUpperCase(),
+      name,
       additionalDetails: {
         installedSolutions: [],
         installedSolutionsCount: 0,

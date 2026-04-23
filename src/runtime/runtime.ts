@@ -68,7 +68,29 @@ export interface Runtime {
   getSolutionLogicalParts: (
     runtimeInternalId: string,
   ) => Promise<{ solutionNamespace: string; solutionGroupId: string } | null>;
+
+  /**
+   * Return this runtime's current health: whether it is started and what
+   * solutions are installed. Used by the /health/readiness endpoint.
+   */
+  getHealth: () => Promise<RuntimeHealth>;
 }
+
+export interface RuntimeHealth {
+  /** True if the runtime has successfully booted and is ready to handle work. */
+  started: boolean;
+  /** Solution IDs currently installed in this runtime. */
+  installedSolutions: string[];
+}
+
+/**
+ * Discriminated identifier used when a caller wants to resolve a solution by
+ * either its NR tab id or its chain-level solutionId. Makes intent explicit at
+ * call sites and avoids ambiguous (undefined, 'value') argument shapes.
+ */
+export type SolutionIdentifier =
+  | { kind: 'noderedId'; value: string }
+  | { kind: 'solutionId'; value: string };
 
 export interface UpsertSolutionInput {
   solutionGroupId: SolutionGroupId;
@@ -84,7 +106,7 @@ export interface UpsertSolutionInput {
 }
 
 export interface InstalledSolutionHandle {
-  /** Runtime-internal id — NR tab id, n8n workflow id, etc. */
+  /** Runtime-internal id, e.g. NR tab id or n8n workflow id. */
   runtimeInternalId: string;
   /** The chain-level solutionId this handle represents, or null if missing. */
   solutionId: string | null;

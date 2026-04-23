@@ -40,7 +40,7 @@ The Worker Node can run solution flows on either of two workflow runtimes:
 
 The runtime is selected per solution at install time. Both runtimes share the same vote submission pipeline, so regardless of which one ran a flow, the resulting vote is signed and submitted by the same code path.
 
-For architecture details and operational notes specific to the n8n runtime, see [RUNTIME-N8N.md](./RUNTIME-N8N.md).
+For architecture details and operational notes specific to the n8n runtime, see [docs/runtime-n8n.md](./docs/runtime-n8n.md).
 
 ---
 

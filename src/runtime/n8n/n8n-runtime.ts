@@ -532,22 +532,26 @@ export const n8nRuntime: Runtime = {
       return;
     }
 
-    const parsedObj = parsed as { nodes?: unknown[] } | null;
-    if (parsedObj == null || !Array.isArray(parsedObj.nodes) || parsedObj.nodes.length === 0) {
+    if (parsed == null) {
+      derivedLogger.error('flow JSON parsed to null, refusing install');
+
+      return;
+    }
+
+    const parsedObj = parsed as { nodes?: unknown[] };
+
+    if (!Array.isArray(parsedObj.nodes) || parsedObj.nodes.length === 0) {
       derivedLogger.error('flow JSON has no nodes array, refusing install');
 
       return;
     }
 
+    const nodes: unknown[] = parsedObj.nodes;
+
     // n8n flows announce themselves with typeVersion on every node. Refuse
     // to install a Node-RED shaped JSON into n8n - that would be silent
     // garbage because n8n would not find any recognizable triggers.
-    if (
-      !parsedObj.nodes.some((n) => {
-        const node = n as { typeVersion?: number };
-        return typeof node.typeVersion === 'number';
-      })
-    ) {
+    if (!nodes.some((n) => typeof (n as { typeVersion?: number }).typeVersion === 'number')) {
       derivedLogger.error(
         'flow JSON does not look like an n8n workflow (no typeVersion on any node)',
       );
@@ -557,7 +561,10 @@ export const n8nRuntime: Runtime = {
 
     // Excluded-nodes check (same semantics as NR's hasExcludedNodes).
     const hasExcluded: boolean = input.excludedNodes.some((rule: string) =>
-      parsed.nodes.some((n: { type?: string }) => n.type != null && n.type.endsWith(rule)),
+      nodes.some((n) => {
+        const type: string | undefined = (n as { type?: string }).type;
+        return type != null && type.endsWith(rule);
+      }),
     );
 
     if (hasExcluded) {
@@ -748,5 +755,16 @@ export const n8nRuntime: Runtime = {
     }
 
     return { solutionNamespace, solutionGroupId };
+  },
+
+  async getHealth() {
+    // The n8n child process is considered started once it is spawned and has
+    // not exited. If the process crashed, n8nProcess is null (we clear it in
+    // the exit handler). Installed solutions come from the local in-memory
+    // index, not a round-trip to n8n, so this is cheap.
+    const started: boolean = n8nProcess != null;
+    const installedSolutions: string[] = Array.from(installedBySolutionId.keys());
+
+    return { started, installedSolutions };
   },
 };

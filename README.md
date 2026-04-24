@@ -31,6 +31,19 @@ Below you can find a High Level Architecture to understand how worker node fit i
 
 ---
 
+## Workflow runtimes
+
+The Worker Node can run solution flows on either of two workflow runtimes:
+
+- **Node-RED** is the original runtime. It runs in-process as a library and is the default for every solution whose chain-declared `executionEnvironment` is `NodeRedV1` (or empty, for backward compatibility). All existing solutions continue to use it unchanged.
+- **n8n** is a second runtime introduced for solutions whose chain-declared `executionEnvironment` is `N8nV1`. It runs as a managed child process bound to `127.0.0.1` and is never exposed outside the loopback interface. The worker starts and supervises n8n automatically; no manual setup is required.
+
+The runtime is selected per solution at install time. Both runtimes share the same vote submission pipeline, so regardless of which one ran a flow, the resulting vote is signed and submitted by the same code path.
+
+For architecture details and operational notes specific to the n8n runtime, see [docs/runtime-n8n.md](./docs/runtime-n8n.md).
+
+---
+
 ## Getting started
 
 If you would like to run Worker Node in fully managed (SaaS) or in Bring your own cloud (BYOC) mode, please refer to our [Launchpad](https://launchpad.energyweb.org) Worker Node offering.

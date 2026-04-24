@@ -21,6 +21,9 @@
     "prettier:format": "prettier --write --ignore-unknown .",
     "prepare": "husky install"
   },
+  "overrides": {
+    "zod": "3.25.67"
+  },
   "dependencies": {
     "@energyweb/node-red-contrib-energywebx": "0.7.2",
     "@energyweb/node-red-contrib-green-proof-worker": "2.5.1",
@@ -32,13 +35,14 @@
     "express-async-handler": "1.2.0",
     "fastq": "1.19.0",
     "jsonwebtoken": "9.0.2",
+    "n8n": "2.17.4",
     "node-red": "4.0.8",
     "object-hash": "3.0.0",
     "pino": "9.6.0",
     "pino-pretty": "13.0.0",
     "pino-roll": "4.0.0",
     "promise-retry": "2.0.1",
-    "zod": "3.24.1"
+    "zod": "3.25.67"
   },
   "devDependencies": {
     "@commitlint/cli": "19.7.1",
@@ -68,5 +72,6 @@
     "*.{json,js,ts,jsx,tsx,html}": [
       "prettier --write --ignore-unknown"
     ]
-  }
+  },
+  "keywords": []
 }

@@ -51,6 +51,5 @@ jobs:
           file: Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.tag }}
+          tags: |            
             ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.tag }}

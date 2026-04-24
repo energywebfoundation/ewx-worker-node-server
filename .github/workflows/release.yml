@@ -94,5 +94,4 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}/ewx-worker-node-server:latest
             ghcr.io/${{ github.repository }}/ewx-worker-node-server:${{ needs.release-module.outputs.new_version }}
-            # ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:latest
-            # ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:${{ needs.release-module.outputs.new_version }}
+            

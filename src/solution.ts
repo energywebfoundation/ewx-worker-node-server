@@ -24,6 +24,7 @@ import {
   type SolutionGroupId,
 } from './polkadot/polka';
 import { type SolutionGroup } from './polkadot/polka-types';
+import { isIndexerSynced, queryStakeFromIndexer } from './util/indexer-queries';
 import { sleep } from './util/sleep';
 import { createLogger } from './util/logger';
 import { createReadPalletApi } from './util/pallet-api';
@@ -270,11 +271,27 @@ const hasValidGroupConfiguration = async (
     return false;
   }
 
-  const hasStake: QueryStakeResult = await queryStake(
-    api,
-    operatorAddress,
-    solutionGroup.namespace,
-  );
+  let hasStake: QueryStakeResult | null = null;
+
+  try {
+    const isSynced = await isIndexerSynced(currentBlockNumber);
+    if (isSynced) {
+      hasStake = await queryStakeFromIndexer(operatorAddress, solutionGroup.namespace);
+    }
+  } catch (error) {
+    logger.warn(
+      { solutionGroupId: solutionGroup.namespace, error },
+      'failed to retrieve stake from indexer',
+    );
+  }
+
+  if (hasStake == null) {
+    logger.info(
+      { solutionGroupId: solutionGroup.namespace },
+      'falling back to direct RPC query for stake',
+    );
+    hasStake = await queryStake(api, operatorAddress, solutionGroup.namespace);
+  }
 
   if (hasStake.currentStake < BigInt(solutionGroup.operatorsConfig.stakingAmounts.min)) {
     logger.info(

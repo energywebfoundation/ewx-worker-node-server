@@ -1,26 +1,21 @@
-import { getAllInstalledSolutionsNames, runtimeStarted } from '../node-red/red';
 import { createKeyringPair } from '../polkadot/account';
 import { MAIN_CONFIG } from '../config';
 import { getOperatorInfo, type OperatorInfo } from '../util/operator-info';
+import { ALL_RUNTIMES } from '../runtime/registry';
 
 enum HealthStatus {
   OK = 'OK',
   ERROR = 'ERROR',
 }
 
-enum ComponentName {
-  RED = 'NODE_RED',
-  READY = 'READY',
-}
+// Back-compat label preserved so existing monitoring keyed on 'NODE_RED' still
+// finds its line item.
+const NODE_RED_HEALTH_LABEL = 'NODE_RED';
 
 interface ComponentHealthStatus {
   status: HealthStatus;
-  name: ComponentName | string;
-}
-
-interface NodeRedHealthStatus extends ComponentHealthStatus {
-  name: ComponentName.RED;
-  additionalDetails: {
+  name: string;
+  additionalDetails?: {
     installedSolutions: string[];
     installedSolutionsCount: number;
   };
@@ -40,34 +35,77 @@ export const isLive = (): ComponentHealthStatus => {
   };
 };
 
+/**
+ * Collect health for every registered runtime in one pass. Runtime.id drives
+ * the reported component name, with Node-RED keeping the legacy 'NODE_RED'
+ * label for back-compat with existing monitoring.
+ */
 export const isReady = async (): Promise<ComponentHealthStatus[]> => {
-  return [await getNodeRedHealth()];
+  const out: ComponentHealthStatus[] = [];
+
+  for (const rt of ALL_RUNTIMES) {
+    const name: string = rt.id === 'node-red' ? NODE_RED_HEALTH_LABEL : rt.id.toUpperCase();
+
+    try {
+      const health = await rt.getHealth();
+
+      out.push({
+        status: health.started ? HealthStatus.OK : HealthStatus.ERROR,
+        name,
+        additionalDetails: {
+          installedSolutions: health.installedSolutions,
+          installedSolutionsCount: health.installedSolutions.length,
+        },
+      });
+    } catch {
+      out.push({
+        status: HealthStatus.ERROR,
+        name,
+        additionalDetails: {
+          installedSolutions: [],
+          installedSolutionsCount: 0,
+        },
+      });
+    }
+  }
+
+  return out;
 };
 
-export const getNodeRedHealth = async (): Promise<NodeRedHealthStatus> => {
-  const started = await runtimeStarted();
+/**
+ * Back-compat helper: some external call sites expect a Node-RED specific
+ * health report. Internally this just surfaces the NR runtime's health, so it
+ * stays consistent with isReady().
+ */
+export const getNodeRedHealth = async (): Promise<ComponentHealthStatus> => {
+  const nr = ALL_RUNTIMES.find((r) => r.id === 'node-red');
 
-  if (!started) {
+  if (nr == null) {
     return {
       status: HealthStatus.ERROR,
-      name: ComponentName.RED,
-      additionalDetails: {
-        installedSolutions: [],
-        installedSolutionsCount: 0,
-      },
+      name: NODE_RED_HEALTH_LABEL,
+      additionalDetails: { installedSolutions: [], installedSolutionsCount: 0 },
     };
   }
 
-  const installedSolutions: string[] = await getAllInstalledSolutionsNames();
+  try {
+    const health = await nr.getHealth();
 
-  return {
-    status: HealthStatus.OK,
-    name: ComponentName.RED,
-    additionalDetails: {
-      installedSolutions,
-      installedSolutionsCount: installedSolutions.length,
-    },
-  };
+    return {
+      status: health.started ? HealthStatus.OK : HealthStatus.ERROR,
+      name: NODE_RED_HEALTH_LABEL,
+      additionalDetails: {
+        installedSolutions: health.installedSolutions,
+        installedSolutionsCount: health.installedSolutions.length,
+      },
+    };
+  } catch {
+    return {
+      status: HealthStatus.ERROR,
+      name: NODE_RED_HEALTH_LABEL,
+      additionalDetails: { installedSolutions: [], installedSolutionsCount: 0 },
+    };
+  }
 };
 
 export const getSolutionGroupsDetailsStatus = async (): Promise<SolutionGroupsDetailsStatus> => {

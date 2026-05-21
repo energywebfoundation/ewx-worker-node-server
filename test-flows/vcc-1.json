@@ -1,0 +1,98 @@
+{
+  "name": "vcc-1",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "ce1a3f4d-0000-4000-8000-000000000001",
+      "name": "Every 30s",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// vcc-1 sanity test: emit a timestamp-shaped vote every schedule tick.\n// The flow posts this payload to the worker's vote server (localhost:3002).\n//\n// Placeholders like {{EWX_SOLUTION_ID}} are substituted by the worker at\n// install time. The operator does not need to set anything in n8n.\n//\n// The vote server accepts either 'noderedId' (legacy NR path) or\n// 'solutionId' (new n8n path); we use solutionId since n8n flows do not\n// have a tab id to pass through.\n\nconst now = Date.now();\n\nreturn [\n  {\n    json: {\n      id: String(now),\n      solutionId: '{{EWX_SOLUTION_ID}}',\n      root: `root-${now}`\n    }\n  }\n];\n",
+        "mode": "runOnceForAllItems"
+      },
+      "id": "ce1a3f4d-0000-4000-8000-000000000002",
+      "name": "Build vote payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3002/sse/1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "ewx-worker-node-server"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "ce1a3f4d-0000-4000-8000-000000000003",
+      "name": "POST /sse/1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 300]
+    }
+  ],
+  "connections": {
+    "Every 30s": {
+      "main": [
+        [
+          {
+            "node": "Build vote payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build vote payload": {
+      "main": [
+        [
+          {
+            "node": "POST /sse/1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "active": false,
+  "versionId": "1"
+}

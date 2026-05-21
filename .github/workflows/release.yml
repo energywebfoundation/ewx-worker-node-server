@@ -94,4 +94,3 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}/ewx-worker-node-server:latest
             ghcr.io/${{ github.repository }}/ewx-worker-node-server:${{ needs.release-module.outputs.new_version }}
-            

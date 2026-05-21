@@ -189,6 +189,7 @@ export const upsertSolution = async (
   worklogicId: string,
   excludedNodes: string[],
   workerAddress: WorkerAddress,
+  flowContent?: string,
 ): Promise<void> => {
   const derivedLogger = redLogger.child({
     solutionId,
@@ -220,7 +221,11 @@ export const upsertSolution = async (
     return;
   }
 
-  const content: string | null = await getSmartFlow(worklogicId, derivedLogger);
+  // Accept pre-fetched content from the caller (new runtime interface path)
+  // or fetch it ourselves (back-compat for any direct caller). Fetching
+  // inside here is the legacy path; the runtime dispatch layer always
+  // pre-fetches so it can apply flow overrides before the runtime sees it.
+  const content: string | null = flowContent ?? (await getSmartFlow(worklogicId, derivedLogger));
 
   if (content == null) {
     derivedLogger.error(`something is wrong with flow json file`);

@@ -1,0 +1,24 @@
+{
+  "local-vcc-1": {
+    "label": "vcc-1",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "seconds",
+                "secondsInterval": 30
+              }
+            ]
+          }
+        },
+        "id": "ce1a3f4d-0000-4000-8000-000000000001",
+        "name": "Every 30s",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [260, 300]
+      }
+    ]
+  }
+}

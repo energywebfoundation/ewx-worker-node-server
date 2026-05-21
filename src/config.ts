@@ -93,6 +93,11 @@ export const ENV_SCHEMA = z.object({
     .number()
     .default(20000)
     .describe('How often should refresh EWX Solutions information from chain (in miliseconds).'),
+  INDEXER_SYNC_BUFFER_BLOCKS: z.coerce
+    .number()
+    .nonnegative()
+    .default(50)
+    .describe('The maximum block delay allowed for the indexer.'),
   LOCAL_SOLUTIONS_PATH: z
     .string()
     .optional()

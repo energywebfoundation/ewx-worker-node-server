@@ -28,6 +28,8 @@ const polkaLogger = pino({
   name: 'PolkaLogger',
 });
 
+const SUBMIT_SOLUTION_RESULT_SIGN_DOMAIN = 'EWX_WorkerSolution_submit_solution_result';
+
 export const createApi = async (palletEndpoint: string): Promise<ApiPromise> => {
   const api: ApiPromise = await ApiPromise.create({
     provider: new HttpProvider(palletEndpoint),
@@ -192,7 +194,25 @@ export const submitSolutionResult = async (
   hashVote: boolean,
 ): Promise<string | null> => {
   const finalVote = hashVote ? blake2AsHex(vote) : vote;
-  const signature = account.sign(finalVote as string | Uint8Array<ArrayBufferLike>);
+
+  const api = await txManager.getConnection();
+
+  const rewardPeriodInfo = await api.query.workerNodePallet.activeRewardPeriodInfo();
+  const rewardPeriodIndex = (
+    rewardPeriodInfo as unknown as { index: { toNumber: () => number } }
+  ).index.toNumber();
+
+  const payload = api
+    .createType('(Bytes, Bytes, Bytes, u32, Bytes)', [
+      SUBMIT_SOLUTION_RESULT_SIGN_DOMAIN,
+      namespace,
+      votingRoundId,
+      rewardPeriodIndex,
+      finalVote,
+    ])
+    .toU8a();
+
+  const signature = account.sign(payload);
 
   const { txHash } = await txManager.sendWithoutSigning((api) =>
     api.tx.workerNodePallet.submitSolutionResult(

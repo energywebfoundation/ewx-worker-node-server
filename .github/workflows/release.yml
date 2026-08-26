@@ -3,6 +3,7 @@ name: Release EWX Worker Node
 on:
   push:
     branches: ['master']
+  workflow_dispatch:
 
 # env:
 #   IMAGE_NAME: ${{ secrets.EWX_WORKER_NODE_SERVER }}

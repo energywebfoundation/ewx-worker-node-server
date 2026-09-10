@@ -102,7 +102,7 @@ const storeWorkerInRegistry = async (token: string, account: KeyringPair): Promi
     )
     .catch((e) => {
       logger.error(e.message);
-      logger.error(e.response.data);
+      logger.error(e.response?.data);
 
       throw e;
     });
@@ -133,7 +133,11 @@ const getWorkerRegistrationStatus = async (
       return WorkerRegistrationStatus.EXISTS;
     })
     .catch((e) => {
-      if (e.status === 404 && e.response.data === '') {
+      // axios (<1.8) exposes the HTTP status on e.response.status, not e.status
+      const status = e.response?.status;
+      const data = e.response?.data;
+
+      if (status === 404 && data === '') {
         logger.error(
           {
             path,
@@ -144,12 +148,12 @@ const getWorkerRegistrationStatus = async (
         return WorkerRegistrationStatus.ERROR;
       }
 
-      if (e.status === 404 && e.response.data.error.name === 'WorkerNotFoundException') {
+      if (status === 404 && data?.error?.name === 'WorkerNotFoundException') {
         return WorkerRegistrationStatus.NOT_EXISTS;
       }
 
       logger.error(e.message);
-      logger.error(e.data);
+      logger.error(data);
 
       return WorkerRegistrationStatus.ERROR;
     });

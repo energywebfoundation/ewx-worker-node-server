@@ -22,6 +22,7 @@
     "prepare": "husky install"
   },
   "dependencies": {
+    "@aztec/bb.js": "0.58.0",
     "@energyweb/node-red-contrib-energywebx": "0.8.1",
     "@energyweb/node-red-contrib-green-proof-worker": "3.0.2",
     "@polkadot/api": "14.0.1",

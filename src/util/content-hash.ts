@@ -5,9 +5,11 @@ export const canonicalize = (value: any): string => {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return '[' + value.map(canonicalize).join(',') + ']';
 
-  const keys = Object.keys(value).sort();
+  const keys = Object.keys(value as object).sort();
 
-  return '{' + keys.map((key) => JSON.stringify(key) + ':' + canonicalize(value[key])).join(',') + '}';
+  return (
+    '{' + keys.map((key) => JSON.stringify(key) + ':' + canonicalize(value[key])).join(',') + '}'
+  );
 };
 
 export const hashProof = (proof: string): string => {

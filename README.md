@@ -87,7 +87,7 @@ You can read more about the environment variables [here](docs/env-vars.md).
    cp .env.default .env
    ```
 
-2. Replace `<SEED>` under the `VOTING_WORKER_SEED` key with your Worker Account Seed. Keep in mind that your Worker Account have to be different thatn Operator Account. If you havent done it already, to generate Worker Node account you can use any of the wallets mentioned in official [Polkadot Docs](https://wiki.polkadot.network/docs/wallets-and-extensions)
+2. Replace `<SEED>` under the `VOTING_WORKER_SEED` key with your Worker Account Seed. Keep in mind that your Worker Account have to be different thatn Operator Account. If you havent done it already, to generate Worker Node account you can use any of the wallets mentioned in official [Polkadot Docs](https://wiki.polkadot.network/learn/learn-account-generation/)
 3. Optionally, you can change `PRETTY_PRINT` to `true` or `false` depending on your use case.
 
 ---

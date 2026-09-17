@@ -17,6 +17,7 @@ import { sleep } from '../util/sleep';
 import { type ParsedFlow, type RedNode, type RedNodes } from './types';
 import { type BaseUrlsConfig, getBaseUrls } from '../util/base-urls';
 import { NodeRedNodePropertyNotFound, NodeRedRuntimeStartFailedError } from '../errors';
+import { canonicalize, hashProof } from '../util/content-hash';
 
 type EWX_ENVS =
   | 'EWX_SOLUTION'
@@ -98,6 +99,8 @@ export const startRedServer = async (app: express.Express): Promise<http.Server>
   const functionGlobalContext = {
     rpcUrl: MAIN_CONFIG.PALLET_RPC_URL,
     snarkjs: require('snarkjs'),
+    barretenberg: require('@aztec/bb.js'),
+    contentHash: { canonicalize, hashProof },
     http: require('http'),
     https: require('https'),
     crypto: require('crypto'),

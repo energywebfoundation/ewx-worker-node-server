@@ -188,7 +188,7 @@ const obtainTokenFromAuthServer = async (
       );
 
       logger.error(e.message);
-      logger.error(e.response.data);
+      logger.error(e.response?.data);
 
       return null;
     });

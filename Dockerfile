@@ -1,5 +1,6 @@
 FROM node:22.21.1-alpine AS base
 WORKDIR /app
+RUN chown node:node /app
 
 FROM base AS builder-base
 RUN apk add --no-cache python3 py3-pip make g++

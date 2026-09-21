@@ -1,70 +1,71 @@
-replicaCount: 1 # can not be more than 1
+generic-microservice-helm:
+  replicaCount: 1 # can not be more than 1
 
-nameOverride: 'ewx-workers-node-service'
-fullnameOverride: 'ewx-workers-node-service'
+  nameOverride: 'ewx-workers-node-service'
+  fullnameOverride: 'ewx-workers-node-service'
 
-# Pod disruption budget will be created only if replicaCount > 1
-pdb:
-  enabled: false
-  minAvailable: 1
-
-deploymentStrategy: RollingUpdate
-
-restartPolicy: Always
-
-terminationGracePeriodSeconds: 30
-
-readinessProbe:
-  enabled: true
-  httpGet:
-    path: /health/readiness
-    port: api
-    scheme: HTTP
-  initialDelaySeconds: 240
-
-livenessProbe:
-  enabled: true
-  httpGet:
-    path: /health/liveness
-    port: api
-    scheme: HTTP
-  initialDelaySeconds: 240
-
-container:
-  ports:
-    http: 8000
-    api: 3002
-
-image:
-  repository: ghcr.io/energywebfoundation/ewx-worker-node-server/ewx-worker-node-server
-  pullPolicy: Always
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: 'latest'
-  command: []
-  args: []
-  tty:
+  # Pod disruption budget will be created only if replicaCount > 1
+  pdb:
     enabled: false
+    minAvailable: 1
 
-env:
-  PALLET_RPC_URL: https://wns-rpc.mainnet.energywebx.com
-  VOTING_RPC_URL: https://wns-rpc.mainnet.energywebx.com
-  WORKER_REGISTRY_URL: 'https://workers-registry.energywebx.com'
-  PALLET_AUTH_SERVER_DOMAIN: 'default'
-  PALLET_AUTH_SERVER_LOGIN_URL: 'https://auth.energywebx.com/api/auth/login'
-  VOTING_WORKER_SEED: <SEED>
+  deploymentStrategy: RollingUpdate
 
-service:
-  portName: ''
-  type: ClusterIP
-  ports:
-    - port: 80
-      name: http
+  restartPolicy: Always
 
-nodeSelector: {}
+  terminationGracePeriodSeconds: 30
 
-tolerations: []
+  readinessProbe:
+    enabled: true
+    httpGet:
+      path: /health/readiness
+      port: api
+      scheme: HTTP
+    initialDelaySeconds: 240
 
-affinity: {}
+  livenessProbe:
+    enabled: true
+    httpGet:
+      path: /health/liveness
+      port: api
+      scheme: HTTP
+    initialDelaySeconds: 240
 
-# -- Extra lables to be added to all resources
-extraLabels: {}
+  container:
+    ports:
+      http: 8000
+      api: 3002
+
+  image:
+    repository: ghcr.io/energywebfoundation/ewx-worker-node-server/ewx-worker-node-server
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: 'latest'
+    command: []
+    args: []
+    tty:
+      enabled: false
+
+  env:
+    PALLET_RPC_URL: https://wns-rpc.mainnet.energywebx.com
+    VOTING_RPC_URL: https://wns-rpc.mainnet.energywebx.com
+    WORKER_REGISTRY_URL: 'https://workers-registry.energywebx.com'
+    PALLET_AUTH_SERVER_DOMAIN: 'default'
+    PALLET_AUTH_SERVER_LOGIN_URL: 'https://auth.energywebx.com/api/auth/login'
+    VOTING_WORKER_SEED: <SEED>
+
+  service:
+    portName: ''
+    type: ClusterIP
+    ports:
+      - port: 80
+        name: http
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  # -- Extra lables to be added to all resources
+  extraLabels: {}

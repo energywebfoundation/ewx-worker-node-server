@@ -3,6 +3,8 @@ name: Release EWX Worker Node
 on:
   push:
     branches: ['master']
+    paths-ignore:
+      - 'helm-chart/**'
   workflow_dispatch:
 
 # env:

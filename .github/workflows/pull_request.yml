@@ -1,6 +1,8 @@
 name: Pull Request
 on:
   pull_request:
+    paths-ignore:
+      - 'helm-chart/**'
 
 jobs:
   commitlint:

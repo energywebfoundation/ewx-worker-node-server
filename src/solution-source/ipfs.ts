@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance } from 'axios';
-import { createLogger } from '../util';
 import { MAIN_CONFIG } from '../config';
+import { createLogger } from '../util/logger';
 
 const ipfsLogger = createLogger('IPFS');
 

@@ -3,8 +3,6 @@ import { MAIN_CONFIG } from '../config';
 import * as RED from 'node-red';
 import * as http from 'http';
 import { type Flows } from '@node-red/runtime';
-import { type ParsedFlow, type RedNode, type RedNodes } from '../types';
-import { createLogger, sleep } from '../util';
 import path from 'path';
 import { mkdirSync, rmSync } from 'fs';
 import {
@@ -14,6 +12,12 @@ import {
 } from './node-red-cache';
 import { getSmartFlow } from '../solution-source/solution-source';
 import { type SolutionGroupId, type SolutionId, type WorkerAddress } from '../polkadot/polka';
+import { createLogger } from '../util/logger';
+import { sleep } from '../util/sleep';
+import { type ParsedFlow, type RedNode, type RedNodes } from './types';
+import { type BaseUrlsConfig, getBaseUrls } from '../util/base-urls';
+import { NodeRedNodePropertyNotFound, NodeRedRuntimeStartFailedError } from '../errors';
+import { canonicalize, hashProof } from '../util/content-hash';
 
 type EWX_ENVS =
   | 'EWX_SOLUTION'
@@ -23,11 +27,12 @@ type EWX_ENVS =
   | 'EWX_RPC_URL'
   | 'BASE_URL'
   | 'EWX_SQLITE_PATH'
-  | 'EWX_WORKER_ADDRESS';
+  | 'EWX_WORKER_ADDRESS'
+  | 'VCC_PROXY_URL';
 
 const redLogger = createLogger('NodeRed');
 
-export const startRedServer = async (app: express.Express): Promise<void> => {
+export const startRedServer = async (app: express.Express): Promise<http.Server> => {
   const loggerConfig = {
     console: {
       level: 'off',
@@ -93,6 +98,12 @@ export const startRedServer = async (app: express.Express): Promise<void> => {
 
   const functionGlobalContext = {
     rpcUrl: MAIN_CONFIG.PALLET_RPC_URL,
+    snarkjs: require('snarkjs'),
+    barretenberg: require('@aztec/bb.js'),
+    contentHash: { canonicalize, hashProof },
+    http: require('http'),
+    https: require('https'),
+    crypto: require('crypto'),
   };
 
   rmSync(MAIN_CONFIG.RED_DIRECTORY, {
@@ -133,6 +144,8 @@ export const startRedServer = async (app: express.Express): Promise<void> => {
 
     redLogger.info(`To access UI panel visit http://localhost:${port}/red`);
   });
+
+  return server;
 };
 
 export const runtimeStarted = async (maxAttempts: number = 10): Promise<boolean> => {
@@ -149,7 +162,7 @@ export const runtimeStarted = async (maxAttempts: number = 10): Promise<boolean>
         `exceeded max attempts of runtime start`,
       );
 
-      throw new Error('Unable to check if runtime started');
+      throw new NodeRedRuntimeStartFailedError();
     }
 
     // Hacky way of testing if runtime is started - if it returns null, it means runtime has not started
@@ -236,6 +249,8 @@ export const upsertSolution = async (
     configs?: any[];
   } = JSON.parse(content);
 
+  const baseUrls: BaseUrlsConfig = await getBaseUrls();
+
   const parsedFlow: ParsedFlow = modifyFlowIds(
     parsedContent,
     solutionGroupId,
@@ -244,6 +259,7 @@ export const upsertSolution = async (
     worklogicId,
     sqliteFilePath,
     workerAddress,
+    baseUrls.rpcUrl,
   );
 
   if (parsedFlow === null) {
@@ -284,7 +300,7 @@ export const getNodeEnv = (
   const envMeta = node.env.find((x) => x.name === key);
 
   if (envMeta == null && throwOnError) {
-    throw new Error(`${key} not found in ${node.id}`);
+    throw new NodeRedNodePropertyNotFound(node.id, key);
   } else if (envMeta == null && !throwOnError) {
     return undefined;
   }
@@ -375,19 +391,42 @@ export const deleteNodesBySolutionGroupId = async (solutionGroupIds: string[]): 
 export const getAllInstalledSolutionsNames = async (): Promise<string[]> => {
   const tabNodes = await getTabNodes();
 
-  const solutionIds: Array<string | null> = await Promise.all(
-    tabNodes.map(async (tabNode: RedNode) => {
-      const solutionId = getNodeEnv(tabNode, 'EWX_SOLUTION_ID', false);
+  const solutionIds: Array<string | null> = tabNodes.map((tabNode: RedNode) => {
+    const solutionId = getNodeEnv(tabNode, 'EWX_SOLUTION_ID', false);
 
-      if (solutionId == null) {
-        return null;
-      }
+    if (solutionId == null) {
+      return null;
+    }
 
-      return solutionId;
-    }),
-  );
+    return solutionId;
+  });
 
   return solutionIds.filter((x) => x !== null);
+};
+
+export interface InstalledSolutionDetails {
+  solutionId: string;
+  solutionGroupId: string;
+}
+
+export const getAllInstalledSolutionsWithGroups = async (): Promise<InstalledSolutionDetails[]> => {
+  const tabNodes = await getTabNodes();
+
+  const solutions: Array<InstalledSolutionDetails | null> = tabNodes.map((tabNode: RedNode) => {
+    const solutionId = getNodeEnv(tabNode, 'EWX_SOLUTION_ID', false);
+    const solutionGroupId = getNodeEnv(tabNode, 'EWX_SOLUTION_GROUP_ID', false);
+
+    if (solutionId == null || solutionGroupId == null) {
+      return null;
+    }
+
+    return {
+      solutionId,
+      solutionGroupId,
+    };
+  });
+
+  return solutions.filter((x): x is InstalledSolutionDetails => x !== null);
 };
 
 export const getTabNodes = async (): Promise<RedNodes> => {
@@ -445,6 +484,7 @@ export const modifyFlowIds = (
   workLogic: string,
   sqlitePath: string,
   workerAddress: string,
+  rpcUrl: string,
 ): ParsedFlow | null => {
   if (parsedFlow?.nodes == null) {
     return null;
@@ -498,7 +538,12 @@ export const modifyFlowIds = (
     {
       type: 'str',
       name: 'EWX_RPC_URL',
-      value: MAIN_CONFIG.PALLET_RPC_URL,
+      value: rpcUrl,
+    },
+    {
+      type: 'str',
+      name: 'VCC_PROXY_URL',
+      value: MAIN_CONFIG.VCC_PROXY_URL,
     },
   ];
 
@@ -511,35 +556,32 @@ export const modifyFlowIds = (
     parsedFlow.configs = [];
   }
 
+  const ewxEnvConfig = {
+    EWX_SOLUTION_ID: solutionId,
+    EWX_SOLUTION_GROUP_ID: solutionGroupId,
+    EWX_WORKLOGIC_ID: workLogic,
+    EWX_SQLITE_PATH: sqlitePath,
+    EWX_WORKER_ADDRESS: workerAddress,
+    EWX_RPC_URL: MAIN_CONFIG.PALLET_RPC_URL,
+    BASE_URL: MAIN_CONFIG.BASE_URLS,
+    VCC_PROXY_URL: MAIN_CONFIG.VCC_PROXY_URL,
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parsedFlow.configs = parsedFlow.configs.map((configContent: any) => {
     return {
       ...configContent,
-      __envConfig: {
-        EWX_SOLUTION_ID: solutionId,
-        EWX_SOLUTION_GROUP_ID: solutionGroupId,
-        EWX_WORKLOGIC_ID: workLogic,
-        EWX_SQLITE_PATH: sqlitePath,
-        EWX_WORKER_ADDRESS: workerAddress,
-        EWX_RPC_URL: MAIN_CONFIG.PALLET_RPC_URL,
-        BASE_URL: MAIN_CONFIG.BASE_URLS,
-      },
+      __envConfig: ewxEnvConfig,
     };
   });
 
   parsedFlow.nodes = parsedFlow.nodes.map((nodeContent: any) => {
-    return {
+    const node = {
       ...nodeContent,
-      __envConfig: {
-        EWX_SOLUTION_ID: solutionId,
-        EWX_SOLUTION_GROUP_ID: solutionGroupId,
-        EWX_WORKLOGIC_ID: workLogic,
-        EWX_SQLITE_PATH: sqlitePath,
-        EWX_WORKER_ADDRESS: workerAddress,
-        EWX_RPC_URL: MAIN_CONFIG.PALLET_RPC_URL,
-        BASE_URL: MAIN_CONFIG.BASE_URLS,
-      },
+      __envConfig: ewxEnvConfig,
     };
+
+    return node;
   });
 
   const uniqueIds = new Set<string>(parsedFlow.nodes.map((f) => f.id));

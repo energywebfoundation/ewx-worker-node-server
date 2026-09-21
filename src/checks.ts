@@ -1,14 +1,14 @@
 import { type ApiPromise } from '@polkadot/api';
 import { type KeyringPair } from '@polkadot/keyring/types';
 import { MAIN_CONFIG } from './config';
-import { sleep } from './util';
 import {
   getOperatorSubscriptions,
   isConnectedAsWorker,
   retryHttpAsyncCall,
 } from './polkadot/polka';
-import axios from 'axios';
-import z from 'zod';
+import { sleep } from './util/sleep';
+import { getBaseUrls } from './util/base-urls';
+import { saveOperatorAddress } from './util/operator-address-cache';
 
 export const runChecks = async (api: ApiPromise, account: KeyringPair, logger): Promise<void> => {
   const shouldRetryInfinite: boolean = MAIN_CONFIG.RETRY_WORKER_CHECKS;
@@ -55,6 +55,9 @@ export const performInitialChecks = async (
 
   logger.info({ operatorAddress }, 'operator address');
 
+  // Save operator address to local cache (with TTL so operator changes are reflected)
+  await saveOperatorAddress(account.address, operatorAddress);
+
   const operatorSubscriptions: string[] = await retryHttpAsyncCall(
     async () => await getOperatorSubscriptions(api, operatorAddress),
   );
@@ -67,7 +70,7 @@ export const performInitialChecks = async (
 
   logger.info({ operatorSubscriptions }, 'operator subscriptions');
 
-  const baseUrlConfigsValid: boolean = await validateBaseUrls(MAIN_CONFIG.BASE_URLS, logger);
+  const baseUrlConfigsValid: boolean = await validateBaseUrls();
 
   if (!baseUrlConfigsValid) {
     logger.error(
@@ -81,35 +84,9 @@ export const performInitialChecks = async (
   return true;
 };
 
-const validateBaseUrls = async (baseUrl: string, logger): Promise<boolean> => {
-  const BaseUrlsConfig = z.object({
-    kafka_url: z.union([z.string(), z.array(z.string())]).optional(),
-    kafka_proxy_url: z.string().optional(),
-    indexer_url: z.string().optional(),
-    rpc_url: z.string().optional(),
-    workers_registry_url: z.string().optional(),
-    workers_nominator_url: z.string().optional(),
-    cas_normalizer_url: z.string().optional(),
-  });
+const validateBaseUrls = async (): Promise<boolean> => {
+  // getBaseUrls will throw exception
+  await getBaseUrls();
 
-  const receivedConfig = await axios
-    .get(baseUrl)
-    .then((x) => x.data)
-    .catch((e) => {
-      logger.error('failed to fetch base url');
-      logger.error(e);
-
-      return false;
-    });
-
-  try {
-    BaseUrlsConfig.parse(receivedConfig);
-
-    return true;
-  } catch (e) {
-    logger.error('failed to parse base urls config');
-    logger.error(e);
-
-    return false;
-  }
+  return true;
 };

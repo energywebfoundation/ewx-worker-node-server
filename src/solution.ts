@@ -7,9 +7,7 @@ import {
   getTabNodes,
   upsertSolution,
 } from './node-red/red';
-import { type RedNode, type RedNodes } from './types';
 import { type Logger } from 'pino';
-import { createLogger, createReadPalletApi, sleep } from './util';
 import { MAIN_CONFIG } from './config';
 import { type NodeRedSolutionCache, setNodeRedSolutionCache } from './node-red/node-red-cache';
 import {
@@ -26,28 +24,45 @@ import {
   type SolutionGroupId,
 } from './polkadot/polka';
 import { type SolutionGroup } from './polkadot/polka-types';
+import { isIndexerSynced, queryStakeFromIndexer } from './util/indexer-queries';
+import { sleep } from './util/sleep';
+import { createLogger } from './util/logger';
+import { createReadPalletApi } from './util/pallet-api';
+import { type RedNode, type RedNodes } from './node-red/types';
+import {
+  solutionGroupCache,
+  solutionNameCache,
+  SOLUTION_GROUP_NAME_CACHE_TTL_MS,
+} from './util/operator-info';
 
 const logger = createLogger('SolutionLoop');
 
 export const pushToQueue = async (account: KeyringPair): Promise<void> => {
   // eslint-disable-next-line no-constant-condition
-  const api: ApiPromise = await retryHttpAsyncCall(async () => await createReadPalletApi());
 
   const timeout: number = MAIN_CONFIG.SOLUTION_QUEUE_PROCESS_DELAY;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    await processSolutionQueue(api, account).catch(async (e) => {
-      logger.error('failed to complete queue loop');
-      logger.error(e);
+    try {
+      const api: ApiPromise = await retryHttpAsyncCall(async () => await createReadPalletApi());
 
-      await sleep(50000);
-      await pushToQueue(account);
+      await processSolutionQueue(api, account).catch(async (e) => {
+        logger.error('failed to complete queue loop');
+        logger.error(e);
+
+        await sleep(50000);
+        await pushToQueue(account);
+        await api.disconnect();
+      });
+
       await api.disconnect();
-    });
-
-    await api.disconnect();
-    await sleep(timeout);
+      await sleep(timeout);
+    } catch (e) {
+      logger.error('Critical error in pushToQueue loop, retrying in 50s');
+      logger.error(e);
+      await sleep(50000);
+    }
   }
 };
 
@@ -91,6 +106,12 @@ async function processSolutionQueue(api: ApiPromise, workerAccount: KeyringPair)
     operatorSubscriptions,
   );
 
+  for (const [id, group] of Object.entries(solutionGroups)) {
+    if (group?.info?.name != null && group.info.name !== '') {
+      await solutionGroupCache.set(id, group.info.name, SOLUTION_GROUP_NAME_CACHE_TTL_MS);
+    }
+  }
+
   logger.info({ operatorSubscriptions, operatorAddress }, `found operator subscriptions`);
 
   const tabNodes: RedNodes = await getTabNodes();
@@ -100,7 +121,17 @@ async function processSolutionQueue(api: ApiPromise, workerAccount: KeyringPair)
     operatorSubscriptions,
   );
 
-  const unfilteredSolutions: SolutionArray = await getSolutions(api);
+  const unfilteredSolutions: SolutionArray = await getSolutions(api, operatorSubscriptions);
+
+  for (const [solutionId, , solutionObj] of unfilteredSolutions) {
+    if (solutionObj?.info?.name != null && solutionObj.info.name !== '') {
+      await solutionNameCache.set(
+        solutionId,
+        solutionObj.info.name,
+        SOLUTION_GROUP_NAME_CACHE_TTL_MS,
+      );
+    }
+  }
 
   const solutions: SolutionArray = unfilteredSolutions.filter((solution) =>
     operatorSubscriptions.includes(solution[1]),
@@ -144,16 +175,34 @@ async function processSolutionQueue(api: ApiPromise, workerAccount: KeyringPair)
     return;
   }
 
+  const solutionGroupStatus = new Set<string>();
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  for (const [_, solutionGroup] of Object.entries(solutionGroups)) {
+    const hasValidConfiguration: boolean = await hasValidGroupConfiguration(
+      api,
+      operatorAddress,
+      solutionGroup,
+    );
+
+    if (!hasValidConfiguration) {
+      logger.warn(
+        { solutionGroupId: solutionGroup.namespace },
+        'operator does not meet criteria for solution group, skipping installation',
+      );
+
+      continue;
+    }
+
+    solutionGroupStatus.add(solutionGroup.namespace);
+  }
+
   for (const solution of activeTargetSolutions) {
     const workLogic: string = solution[2].workload.workLogic;
 
-    const isSuccesful: boolean = await hasValidGroupConfiguration(
-      api,
-      operatorAddress,
-      solutionGroups[solution[1]],
-    );
+    const fulfillsSolutionGroupCriteria = solutionGroupStatus.has(solution[1]);
 
-    if (!isSuccesful) {
+    if (!fulfillsSolutionGroupCriteria) {
       logger.warn(
         {
           solutionId: solution[0],
@@ -222,11 +271,27 @@ const hasValidGroupConfiguration = async (
     return false;
   }
 
-  const hasStake: QueryStakeResult = await queryStake(
-    api,
-    operatorAddress,
-    solutionGroup.namespace,
-  );
+  let hasStake: QueryStakeResult | null = null;
+
+  try {
+    const isSynced = await isIndexerSynced(currentBlockNumber);
+    if (isSynced) {
+      hasStake = await queryStakeFromIndexer(operatorAddress, solutionGroup.namespace);
+    }
+  } catch (error) {
+    logger.warn(
+      { solutionGroupId: solutionGroup.namespace, error },
+      'failed to retrieve stake from indexer',
+    );
+  }
+
+  if (hasStake == null) {
+    logger.info(
+      { solutionGroupId: solutionGroup.namespace },
+      'falling back to direct RPC query for stake',
+    );
+    hasStake = await queryStake(api, operatorAddress, solutionGroup.namespace);
+  }
 
   if (hasStake.currentStake < BigInt(solutionGroup.operatorsConfig.stakingAmounts.min)) {
     logger.info(

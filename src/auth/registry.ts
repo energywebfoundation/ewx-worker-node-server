@@ -1,11 +1,13 @@
 import type { KeyringPair } from '@polkadot/keyring/types';
 import axios from 'axios';
-import { MAIN_CONFIG } from './config';
-import { createLogger, createReadPalletApi } from './util';
 import promiseRetry from 'promise-retry';
 import { u8aToHex } from '@polkadot/util';
-import { createToken } from './auth/login';
 import { type ApiPromise } from '@polkadot/api';
+import { createReadPalletApi } from '../util/pallet-api';
+import { createLogger } from '../util/logger';
+import { getToken } from './login';
+import { getBaseUrls } from '../util/base-urls';
+import { AppVersion } from '../util/version';
 
 const logger = createLogger('WorkersRegistry');
 
@@ -26,7 +28,7 @@ export const registerWorker = async (account: KeyringPair): Promise<void> => {
       try {
         logger.info('attempting to retrieve token');
 
-        const token: string | null = await createToken(account);
+        const token: string | null = await getToken();
 
         if (token == null) {
           return retry(new Error('failed to sign in'));
@@ -57,6 +59,8 @@ export const registerWorker = async (account: KeyringPair): Promise<void> => {
           return retry(new Error('unable to register worker in registry'));
         }
       } catch (e) {
+        logger.error(e);
+
         return retry(e);
       } finally {
         await api.disconnect();
@@ -79,9 +83,11 @@ const storeWorkerInRegistry = async (token: string, account: KeyringPair): Promi
     ),
   );
 
+  const { workersRegistryUrl } = await getBaseUrls();
+
   await axios
     .post(
-      MAIN_CONFIG.WORKER_REGISTRY_URL + `/api/v1/workers`,
+      workersRegistryUrl + `/api/v1/workers`,
       {
         source,
         signature,
@@ -89,6 +95,8 @@ const storeWorkerInRegistry = async (token: string, account: KeyringPair): Promi
       {
         headers: {
           Authorization: `Bearer ${token}`,
+          'x-worker-version': AppVersion.version,
+          'x-worker-source': 'WNS',
         },
       },
     )
@@ -105,7 +113,9 @@ const getWorkerRegistrationStatus = async (
   workerAddress: string,
   api: ApiPromise,
 ): Promise<WorkerRegistrationStatus> => {
-  const path = MAIN_CONFIG.WORKER_REGISTRY_URL + `/api/v1/workers/${workerAddress}`;
+  const { workersRegistryUrl } = await getBaseUrls();
+
+  const path = workersRegistryUrl + `/api/v1/workers/${workerAddress}`;
 
   return await axios
     .get(path, {
@@ -139,7 +149,7 @@ const getWorkerRegistrationStatus = async (
       }
 
       logger.error(e.message);
-      logger.error(e.response.data);
+      logger.error(e.data);
 
       return WorkerRegistrationStatus.ERROR;
     });

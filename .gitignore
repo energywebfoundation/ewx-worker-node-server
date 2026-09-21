@@ -48,3 +48,5 @@ Thumbs.db
 heartbeat
 ./heartbeat
 local-smartflow-source.json
+heartbeat_monitor.txt
+build.json

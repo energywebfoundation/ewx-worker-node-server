@@ -1,13 +1,14 @@
 import { ApiPromise, HttpProvider } from '@polkadot/api';
-import { blake2AsHex, cryptoWaitReady } from '@polkadot/util-crypto';
-import { Tuple, u128, u32 } from '@polkadot/types-codec';
 import { type KeyringPair } from '@polkadot/keyring/types';
-import { type Solution, type SolutionGroup } from './polka-types';
-import pino from 'pino';
+import { Tuple, u128, u32 } from '@polkadot/types-codec';
 import { stringToU8a, u8aConcat, u8aToHex } from '@polkadot/util';
+import { blake2AsHex, cryptoWaitReady } from '@polkadot/util-crypto';
+import pino from 'pino';
 import promiseRetry from 'promise-retry';
 import { type WrapOptions } from 'retry';
-import { sleep } from '../util';
+import { type Solution, type SolutionGroup } from './polka-types';
+import { type EwxTxManager } from './ewx-tx-manager';
+import { UnableToDecodeSolutionGroup, UnableToObtainStakeError } from '../errors';
 
 export type WorkerAddress = string;
 export type OperatorAddress = string;
@@ -26,6 +27,8 @@ export interface QueryStakeResult {
 const polkaLogger = pino({
   name: 'PolkaLogger',
 });
+
+const SUBMIT_SOLUTION_RESULT_SIGN_DOMAIN = 'EWX_WorkerSolution_submit_solution_result';
 
 export const createApi = async (palletEndpoint: string): Promise<ApiPromise> => {
   const api: ApiPromise = await ApiPromise.create({
@@ -55,6 +58,10 @@ export const retryHttpAsyncCall = async <T>(
     try {
       return await call();
     } catch (e) {
+      if (e.message === 'FATAL: Unable to initialize the API: [502]: Bad Gateway') {
+        return retry(e);
+      }
+
       if (e.message === 'FATAL: Unable to initialize the API: fetch failed') {
         return retry(e);
       }
@@ -90,7 +97,7 @@ export const getSolutionGroupsByIds = async (
       curr.toPrimitive() as unknown as SolutionGroup;
 
     if (primitive == null) {
-      throw new Error('Unable to decode codec for Solution Group');
+      throw new UnableToDecodeSolutionGroup();
     }
 
     acc[primitive.namespace] = primitive;
@@ -99,8 +106,27 @@ export const getSolutionGroupsByIds = async (
   }, {});
 };
 
-export const getSolutions = async (api: ApiPromise): Promise<SolutionArray> => {
+export const getSolutions = async (
+  api: ApiPromise,
+  operatorSubscriptions: string[],
+): Promise<SolutionArray> => {
   const solutions = await api.query.workerNodePallet.solutions.entries();
+
+  const solutionsWithGroups: Record<string, string> =
+    await api.query.workerNodePallet.groupOfSolution.entries().then((x) => {
+      return x
+        .map(([solutionNamespace, groupOfSolution]) => {
+          return {
+            solutionNamespace: (solutionNamespace.toHuman() as unknown as SolutionId)[0],
+            groupOfSolution: groupOfSolution.toHuman() as unknown as SolutionGroupId,
+          };
+        })
+        .reduce((acc, curr) => {
+          acc[curr.solutionNamespace] = curr.groupOfSolution;
+
+          return acc;
+        }, {});
+    });
 
   const results: SolutionArray = await Promise.all(
     solutions.map(async ([namespaceHash, solution]) => {
@@ -108,12 +134,12 @@ export const getSolutions = async (api: ApiPromise): Promise<SolutionArray> => {
 
       const solutionPrimitive = solution.toPrimitive() as unknown as Solution;
 
-      const groupOfSolution = await api.query.workerNodePallet.groupOfSolution(solutionId);
-
-      const solutionGroupId: string | null =
-        groupOfSolution.toPrimitive() as unknown as SolutionGroupId;
-
-      return [solutionId, solutionGroupId, solutionPrimitive, solutionPrimitive.status];
+      return [
+        solutionId,
+        solutionsWithGroups[solutionId] ?? null,
+        solutionPrimitive,
+        solutionPrimitive.status,
+      ];
     }),
   );
 
@@ -160,68 +186,45 @@ export const getOperatorSubscriptions = async (
 };
 
 export const submitSolutionResult = async (
-  api: ApiPromise,
+  txManager: EwxTxManager,
   account: KeyringPair,
   namespace: string,
-  nodeHash: string,
+  vote: string,
   votingRoundId: string,
-  loopTimeMiliseconds = 3000,
+  hashVote: boolean,
 ): Promise<string | null> => {
-  const resultHash = blake2AsHex(nodeHash);
-  const signature = account.sign(resultHash);
+  const finalVote = hashVote ? blake2AsHex(vote) : vote;
 
-  const utx = api.tx.workerNodePallet.submitSolutionResult(
-    namespace,
-    votingRoundId,
-    resultHash,
-    signature,
-    account.publicKey,
+  const api = await txManager.getConnection();
+
+  const rewardPeriodInfo = await api.query.workerNodePallet.activeRewardPeriodInfo();
+  const rewardPeriodIndex = (
+    rewardPeriodInfo as unknown as { index: { toNumber: () => number } }
+  ).index.toNumber();
+
+  const payload = api
+    .createType('(Bytes, Bytes, Bytes, u32, Bytes)', [
+      SUBMIT_SOLUTION_RESULT_SIGN_DOMAIN,
+      namespace,
+      votingRoundId,
+      rewardPeriodIndex,
+      finalVote,
+    ])
+    .toU8a();
+
+  const signature = account.sign(payload);
+
+  const { txHash } = await txManager.sendWithoutSigning((api) =>
+    api.tx.workerNodePallet.submitSolutionResult(
+      namespace,
+      votingRoundId,
+      finalVote,
+      signature,
+      account.publicKey,
+    ),
   );
 
-  const transactionHash: string | null = await new Promise(
-    // eslint-disable-next-line no-async-promise-executor,@typescript-eslint/no-misused-promises
-    async (resolve, reject) => {
-      let counter = 0;
-      let check = true;
-      const BLOCK_HEADER_MAX: number = 12 * 5;
-
-      await utx
-        .send(async (data) => {
-          while (check) {
-            if (counter >= BLOCK_HEADER_MAX) {
-              resolve(null);
-            }
-
-            const signedBlock = await api.rpc.chain.getBlock().catch(() => undefined);
-
-            if (signedBlock == null) {
-              continue;
-            }
-
-            const lastHdr = signedBlock.block.header;
-            const extrinsicHash = data.toHuman();
-
-            await Promise.allSettled(
-              signedBlock.block.extrinsics.map(async (ex) => {
-                if (extrinsicHash === ex.hash.toHex()) {
-                  resolve(lastHdr.hash.toHex());
-
-                  check = false;
-                }
-              }),
-            );
-            await sleep(loopTimeMiliseconds);
-
-            counter = counter + 1;
-          }
-        })
-        .catch((e) => {
-          reject(e);
-        });
-    },
-  );
-
-  return transactionHash;
+  return txHash;
 };
 
 export const queryStake = async (
@@ -245,7 +248,7 @@ export const queryStake = async (
   );
 
   if (currentStake == null || period == null || nextStake == null) {
-    throw new Error('unable to obtain stake');
+    throw new UnableToObtainStakeError();
   }
 
   return {

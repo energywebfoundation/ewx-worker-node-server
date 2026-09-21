@@ -53,7 +53,7 @@ If you would like to proceed with Blockchain-setup now go to [Blockchain Account
 Worker Node gets solutions Worklogic NodeRed flow files from [IPFS (Inter Planetary File System)](https://ipfs.tech).
 Hence, if solutions you intend to run are stored in IPFS, you need to configure proper credentials.
 
-By default it's configured to `ipfs.io` so there is no configuration required but if you experience any issues with that you can switch to different [IPFS Gateway](https://ipfs.github.io/public-gateway-checker/).
+By default it's configured to `https://workers-registry.energyweb.org` so there is no configuration required but if you experience any issues with that you can switch to different [IPFS Gateway](https://ipfs.github.io/public-gateway-checker/).
 
 In order to make it work you need to modify `IPFS_URL` environment variable with one of the gateways.
 

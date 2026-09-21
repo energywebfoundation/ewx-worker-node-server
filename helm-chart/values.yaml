@@ -52,7 +52,6 @@ generic-microservice-helm:
     WORKER_REGISTRY_URL: 'https://workers-registry.energywebx.com'
     PALLET_AUTH_SERVER_DOMAIN: 'default'
     PALLET_AUTH_SERVER_LOGIN_URL: 'https://auth.energywebx.com/api/auth/login'
-    VOTING_WORKER_SEED: <SEED>
 
   service:
     portName: ''
